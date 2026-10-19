@@ -613,8 +613,42 @@ void update_fake_pad(unsigned long frame, unsigned long holdFrames)
 SDL_JoystickID s_padId[PAD_CHANMAX];
 bool s_padsLooked = false;
 
+#if defined(AURORA_ENABLE_OPENXR)
+// One player wears the headset, so in XR a gamepad plays on port 0 with the headset's controllers.
+// SDL numbers players across every gamepad it sees, Quest's own input included (which Aurora then
+// skips), so a lone pad lands on port 1 or on none. When port 0 is empty, the lowest-port pad, or
+// failing that one on no port, moves there. Through PAD, so the saved port preferences agree.
+void gamepad_to_port0()
+{
+    if (!aurora_xr_active() || PADGetIndexForPort(0) >= 0)
+        return;
+
+    s32 move = -1;
+    for (u32 p = 1; p < PAD_CHANMAX && move < 0; p++)
+        move = PADGetIndexForPort(p);
+
+    for (u32 idx = 0; idx < PADCount() && move < 0; idx++)
+    {
+        bool placed = false;
+        for (u32 p = 1; p < PAD_CHANMAX; p++)
+            placed = placed || PADGetIndexForPort(p) == (s32)idx;
+        if (!placed)
+            move = (s32)idx;
+    }
+
+    if (move < 0)
+        return;
+    PADSetPortForIndex((u32)move, 0);
+    OSReport("[port] input: XR: gamepad '%s' moved to port 0\n", PADGetName(0));
+}
+#endif
+
 void poll_controllers(bool report)
 {
+#if defined(AURORA_ENABLE_OPENXR)
+    gamepad_to_port0();
+#endif
+
     for (u32 p = 0; p < PAD_CHANMAX; p++)
     {
         const s32 idx = PADGetIndexForPort(p);
@@ -633,10 +667,18 @@ void poll_controllers(bool report)
 
 }   // namespace
 
+// On by default where there is a keyboard to expect. A headset has none, and port 0 held for one
+// pushes the first gamepad to port 1, where the game will not let it pick a side.
+#if defined(__ANDROID__)
+constexpr bool kKeyboardByDefault = false;
+#else
+constexpr bool kKeyboardByDefault = true;
+#endif
+
 extern "C" int PortInputKeyboardEnabled(void)
 {
     const char* v = input_cfg("STRIKERS_KEYBOARD");
-    return v == nullptr || !cfg_off(v);
+    return v == nullptr ? kKeyboardByDefault : !cfg_off(v);
 }
 
 extern "C" int PortInputPadSetting(unsigned int pad)
@@ -668,10 +710,7 @@ extern "C" int PortInputPadSetting(unsigned int pad)
 
 extern "C" void PortInstallKeyboardBindings(void)
 {
-    const char* keyboard = input_cfg("STRIKERS_KEYBOARD");
-    const bool keyboardOff = keyboard != nullptr && cfg_off(keyboard);
-
-    if (!keyboardOff)
+    if (PortInputKeyboardEnabled())
     {
         resolve_keys();
         port_check_bindings_distinct();
@@ -1058,14 +1097,16 @@ extern "C" void PortUpdateSyntheticInput(unsigned long frame)
     }
     held |= fake_key_state(frame, &lx, &ly, &rx, &ry, &tl, &tr);
 
-#if defined(AURORA_ENABLE_OPENXR)
     // The headset's controllers, as a GameCube pad that Aurora's XR thread keeps current. Merged
     // here rather than handed to PAD as a pad of their own, so they share port 0 with everything
-    // else above instead of displacing it.
+    // else above instead of displacing it. While they are there, port 0 stays connected at rest.
+    bool xrPad = false;
+#if defined(AURORA_ENABLE_OPENXR)
     {
         PADStatus xr;
         if (aurora_xr_get_pad(&xr))
         {
+            xrPad = true;
             held |= xr.button;
             lx += xr.stickX;
             ly += xr.stickY;
@@ -1080,7 +1121,7 @@ extern "C" void PortUpdateSyntheticInput(unsigned long frame)
     // The debug menu detaches the keyboard, so a neutral virtual pad keeps port 0 connected.
     const bool menuHasKeyboard = PortOverlayMenuOpen() && PortInputKeyboardEnabled();
     if (held == 0 && lx == 0 && ly == 0 && rx == 0 && ry == 0 && tl == 0 && tr == 0 &&
-        !menuHasKeyboard)
+        !menuHasKeyboard && !xrPad)
     {
         PADClearVirtualStatus(0);
         return;

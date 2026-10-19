@@ -310,6 +310,10 @@ if(STRIKERS_AURORA)
     # aurora/event.h exposes SDL_Event, so the game needs SDL3 on its include path.
     target_include_directories(port_flags INTERFACE
         $<TARGET_PROPERTY:aurora::core,INTERFACE_INCLUDE_DIRECTORIES>)
+    # Only the include directories come across above, and src/platform asks for the XR API by this.
+    if(AURORA_ENABLE_OPENXR)
+        target_compile_definitions(port_flags INTERFACE AURORA_ENABLE_OPENXR)
+    endif()
 endif()
 
 # Source sets src/Dolphin, src/PowerPC_EABI_Support and src/SDK are vendored but not built: Aurora
