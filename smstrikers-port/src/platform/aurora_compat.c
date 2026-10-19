@@ -11,11 +11,6 @@
 
 #include "port/aurora_compat.h"
 
-void GXWaitDrawDone(void)
-{
-    GXDrawDone();
-}
-
 void GXClearGPMetric(void) {}
 void GXSetGPMetric(u32 perf0, u32 perf1) { (void)perf0; (void)perf1; }
 

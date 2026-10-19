@@ -1,0 +1,4 @@
+[submodule "aurora"]
+	path = smstrikers-port/extern/aurora
+	url = https://github.com/rhythmerc/aurora.git
+	branch = strikers
