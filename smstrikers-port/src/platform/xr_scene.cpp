@@ -27,6 +27,7 @@
 extern "C" void PortXrBeginFrame(int, int, float, float) {}
 extern "C" int PortXr3D(void) { return 0; }
 extern "C" int PortXrCullPlanes(float[6][4]) { return 0; }
+extern "C" int PortXrBoard(float*, float*, float*) { return 0; }
 extern "C" void PortXrSendView(int, const float[3][4]) {}
 extern "C" void PortXrEndViews(void) {}
 extern "C" void PortXrPauseMenu(int) {}
@@ -120,7 +121,11 @@ bool view_left_out(int view)
 constexpr float kAuroraArenaScale = 0.0035f;
 
 bool s_3d;
-bool s_worldSent;   // this frame's clip planes went out with its first world view
+int s_cutsSent;     // this frame: -1 nothing yet, 0 world draws uncut (the board), 1 cut
+
+// The view the board goes out in (src/platform/xr_board.cpp): GLV_Unshadowed, otherwise empty in a
+// match. Its draws aren't cut, since the board stands outside the line the stadium is cut along.
+constexpr int kBoardView = 7;
 int s_stadium = -1;
 float s_halfLength, s_halfWidth;
 int s_pauseMenus;
@@ -137,41 +142,75 @@ float cfg_float(const char* env, float fallback)
 // The pitch's length on the table, in metres (xr_pitch in strikers.ini).
 float pitch_metres() { return cfg_float("STRIKERS_XR_PITCH", 1.0f); }
 
-void place_stadium(int stadium, float halfLength, float halfWidth)
+// The board under the pitch (Game/Render/XrBoard.cpp), unless xr_stands is on: its top's
+// half-extents, which the stadium is cut to, and its depth, in game units.
+bool board_on() { return std::getenv("STRIKERS_XR_STANDS") == nullptr; }
+float board_half_x() { return s_halfLength + cfg_float("STRIKERS_XR_BOARD_END", 3.0f); }
+float board_half_y() { return s_halfWidth + cfg_float("STRIKERS_XR_BOARD_SIDE", 2.0f); }
+float board_depth() { return cfg_float("STRIKERS_XR_BOARD_DEPTH", 2.5f); }
+constexpr float kBoardFlare = 1.2f + 0.35f;   // the foot's reach past the top (XrBoard.cpp)
+
+void place_stadium(int stadium)
 {
     // Aurora's stage scale is a factor on its default metres per game unit.
-    const float scale = pitch_metres() / (2.f * halfLength) / kAuroraArenaScale;
-    aurora_xr_set_stage(stadium, 0.f, 0.f, 0.f, scale);
-
-    // The pitch and its fences stand on the real surface; the stands beyond them are cut on the
-    // near sides (update_cuts) and seen across the pitch, so they cast no shadow of their own.
-    aurora_xr_set_stage_footprint(-halfLength, halfLength, -halfWidth, halfWidth, 0.f);
-    OSReport("[port] xr: stadium %d, pitch %.1f x %.1f units, %.2f m long\n", stadium,
-             2.f * halfLength, 2.f * halfWidth, pitch_metres());
+    const float scale = pitch_metres() / (2.f * s_halfLength) / kAuroraArenaScale;
+    if (board_on())
+    {
+        // The board's foot is what stands on the table: the arena's position is under the
+        // pitch's centre by the board's depth. (Aurora's axes: game z is its y.)
+        const float depth = board_depth();
+        aurora_xr_set_stage(stadium, 0.f, -depth, 0.f, scale);
+        const float fx = board_half_x() + kBoardFlare, fy = board_half_y() + kBoardFlare;
+        aurora_xr_set_stage_footprint(-fx, fx, -fy, fy, -depth);
+    }
+    else
+    {
+        // The pitch and its fences stand on the real surface; the stands beyond them are cut on
+        // the near sides (update_cuts) and seen across the pitch, so they cast no shadow.
+        aurora_xr_set_stage(stadium, 0.f, 0.f, 0.f, scale);
+        aurora_xr_set_stage_footprint(-s_halfLength, s_halfLength, -s_halfWidth, s_halfWidth, 0.f);
+    }
+    OSReport("[port] xr: stadium %d, pitch %.1f x %.1f units, %.2f m long, %s\n", stadium,
+             2.f * s_halfLength, 2.f * s_halfWidth, pitch_metres(), board_on() ? "on a board" : "in its stands");
 }
 
-// The stands between the player and the pitch would hide it, so each side of the pitch the head
-// is beyond has everything past that side's line cut away (a little past it, with a soft edge, so
-// the fences and the goals stay whole). Looking from a corner, two sides go. Everything above the
-// stands goes too: roofs and domes would close over the player's head. Kept where
-// a x + b y + c z + d >= 0, in the game's axes; worked out once a frame, at its start, so the
-// game's culling (PortXrCullPlanes) and the eyes' clipping agree.
+// What the 3D view cuts away, kept where a x + b y + c z + d >= 0 in the game's axes, with each
+// cut's soft band (0: a hard edge). Worked out once a frame, at its start, so the game's culling
+// (PortXrCullPlanes) and the eyes' clipping agree. Everything above the stands goes, since roofs
+// and domes would close over the player's head. Then either:
+//   - on a board (the default): the stadium is cut hard all round the board's top, and the pitch
+//     stands on the board (Game/Render/XrBoard.cpp);
+//   - in its stands (xr_stands): each side of the pitch the head is beyond has everything past
+//     that side's line cut away, a little past it and softly, so the stands there don't hide the
+//     pitch. Looking from a corner, two sides go.
 constexpr int kMaxCuts = 5;
 float s_cuts[kMaxCuts][4];
+float s_cutFades[kMaxCuts];
 int s_cutCount;
 
 void update_cuts()
 {
     s_cutCount = 0;
-    auto keep = [](float a, float b, float c, float d) {
-        float* p = s_cuts[s_cutCount++];
+    auto keep = [](float a, float b, float c, float d, float fade) {
+        float* p = s_cuts[s_cutCount];
         p[0] = a;
         p[1] = b;
         p[2] = c;
         p[3] = d;
+        s_cutFades[s_cutCount++] = fade;
     };
 
-    keep(0.f, 0.f, -1.f, cfg_float("STRIKERS_XR_ROOF", 8.0f));
+    keep(0.f, 0.f, -1.f, cfg_float("STRIKERS_XR_ROOF", 8.0f), 1.5f);
+
+    if (board_on())
+    {
+        const float hx = board_half_x(), hy = board_half_y();
+        keep(1.f, 0.f, 0.f, hx, 0.f);
+        keep(-1.f, 0.f, 0.f, hx, 0.f);
+        keep(0.f, 1.f, 0.f, hy, 0.f);
+        keep(0.f, -1.f, 0.f, hy, 0.f);
+        return;
+    }
 
     float m[3][4];
     if (!aurora_xr_audio_listener(m))
@@ -187,13 +226,13 @@ void update_cuts()
 
     const float margin = cfg_float("STRIKERS_XR_STAND_MARGIN", 2.0f);
     if (gx < -s_halfLength)
-        keep(1.f, 0.f, 0.f, s_halfLength + margin);
+        keep(1.f, 0.f, 0.f, s_halfLength + margin, 1.5f);
     if (gx > s_halfLength)
-        keep(-1.f, 0.f, 0.f, s_halfLength + margin);
+        keep(-1.f, 0.f, 0.f, s_halfLength + margin, 1.5f);
     if (gy < -s_halfWidth)
-        keep(0.f, 1.f, 0.f, s_halfWidth + margin);
+        keep(0.f, 1.f, 0.f, s_halfWidth + margin, 1.5f);
     if (gy > s_halfWidth)
-        keep(0.f, -1.f, 0.f, s_halfWidth + margin);
+        keep(0.f, -1.f, 0.f, s_halfWidth + margin, 1.5f);
 }
 
 // The cuts to Aurora, for the eyes: in its axes, where a game point (x, y, z) is (x, z, -y).
@@ -207,7 +246,7 @@ void send_cuts()
         planes[i][1] = s_cuts[i][2];
         planes[i][2] = -s_cuts[i][1];
         planes[i][3] = s_cuts[i][3];
-        fades[i] = 1.5f;
+        fades[i] = s_cutFades[i];
     }
     aurora_xr_world_clips4(planes, fades, s_cutCount);
 }
@@ -216,7 +255,7 @@ void send_cuts()
 
 extern "C" void PortXrBeginFrame(int cameraType, int stadium, float halfLength, float halfWidth)
 {
-    s_worldSent = false;
+    s_cutsSent = -1;
     s_3d = aurora_xr_active() && stadium >= 0 && camera_is_live(cameraType) &&
            std::getenv("STRIKERS_XR_FLAT") == nullptr;
     if (!s_3d)
@@ -227,13 +266,23 @@ extern "C" void PortXrBeginFrame(int cameraType, int stadium, float halfLength, 
         s_stadium = stadium;
         s_halfLength = halfLength;
         s_halfWidth = halfWidth;
-        place_stadium(stadium, halfLength, halfWidth);
+        place_stadium(stadium);
     }
     aurora_xr_set_paused(s_pauseMenus > 0);
     update_cuts();
 }
 
 extern "C" int PortXr3D(void) { return s_3d; }
+
+extern "C" int PortXrBoard(float* halfX, float* halfY, float* depth)
+{
+    if (!s_3d || !board_on())
+        return 0;
+    *halfX = board_half_x();
+    *halfY = board_half_y();
+    *depth = board_depth();
+    return 1;
+}
 
 extern "C" int PortXrCullPlanes(float planes[6][4])
 {
@@ -272,10 +321,14 @@ extern "C" void PortXrSendView(int view, const float viewMtx[3][4])
         v[r][3] = viewMtx[r][3];
     }
     aurora_xr_camera(AURORA_XR_WORLD, v);
-    if (!s_worldSent)
+    const int cut = view == kBoardView ? 0 : 1;
+    if (cut != s_cutsSent)
     {
-        s_worldSent = true;
-        send_cuts();
+        s_cutsSent = cut;
+        if (cut)
+            send_cuts();
+        else
+            aurora_xr_world_clips4(nullptr, nullptr, 0);
     }
 }
 

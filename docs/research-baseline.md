@@ -425,6 +425,39 @@ benchmark demo matches (seed 1), with dynamic resolution off.
 - `AURORA_XR_BINDLESS=0` dies on a WGSL extension error. It's off the default
   path, so it isn't fixed.
 
+**Later the same day: the board, resolution and pacing.**
+
+- **On a board:** at the user's request the stadium is no longer kept in its
+  stands. Everything outside a box around the pitch is cut hard, 3 units past
+  each goal line and 2 past each touchline. The pitch stands on a tapered
+  metal plinth (`src/platform/xr_board.cpp`): one unlit, vertex-coloured mesh
+  of 52 vertices, drawn in its own view so the cuts don't take it.
+  - The arena's position is the plinth's foot, so it stands on the table.
+  - The old near-side rule is still available as `xr_stands`.
+  - World draws fell from 695 to about 510.
+- **Resolution:** dynamic resolution can now climb in this mode. The climb
+  waited on margins from lock-step pacing's probe, which a game on its own
+  timer never gets. The 0.7 floor is gone too (it bought nothing here).
+
+| On the board | 3D frames | Scale | Eyes |
+|---|---|---|---|
+| 72 Hz | full | 1.30 | 9.1 ms |
+| 80 Hz | 78.3/s (98%) | 1.30 | 8.1 ms |
+| 90 Hz | 88.0/s (98%) | 1.00 | 6.6 ms |
+| 90 Hz, MSAA off | 88.4/s | 1.00 | 6.7 ms |
+
+- **Pacing, corrected:** a system trace (`atrace`, Aurora's trace sections)
+  shows the hand-over isn't what limits 90 Hz.
+  - The render worker encodes the eyes ahead into an image the XR thread has
+    acquired but not yet waited on, and submits about 1 ms after each loop
+    wakes.
+  - A frame misses only when its GPU work (the eyes plus Meta's compositor)
+    isn't done by the next loop.
+  - The 3D image waits counted above were that, not a cause.
+  - With the stands in, the eyes cost 9 ms; on the board they cost 6.6 ms
+    at native resolution.
+- **Default:** 80 Hz, at the top of dynamic resolution.
+
 **Debug settings:**
 - `xr_hide` (eGLView numbers): leaves views out of 3D, to measure each one's
   cost.

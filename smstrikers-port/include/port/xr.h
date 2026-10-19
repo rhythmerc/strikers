@@ -23,6 +23,15 @@ int PortXr3D(void);
 // eyes see the whole pitch whatever the game camera does. Returns 0, leaving them, otherwise.
 int PortXrCullPlanes(float planes[6][4]);
 
+// In a 3D frame on a board (the default; not with xr_stands): the board's top, as half-extents
+// from the pitch's centre along x and y, and its depth under the pitch, in game units. The stadium
+// is cut along the top's edge. Returns 0 otherwise.
+int PortXrBoard(float* halfX, float* halfY, float* depth);
+
+// From the world's render, each frame: puts the board in this frame's draw lists (a no-op outside
+// a 3D frame on a board). src/platform/xr_board.cpp.
+void PortXrDrawBoard(void);
+
 // Before each view's packets go out, with that view's view matrix in GX layout (world to camera,
 // the game's z up).
 void PortXrSendView(int view, const float viewMtx[3][4]);

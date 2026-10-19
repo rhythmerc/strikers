@@ -1428,6 +1428,8 @@ void World::Render()
                 g_portCullTested = g_portCullDropped = 0;
             }
         }
+    PortXrDrawBoard();   // PORT: XR. Nothing outside a 3D frame.
+
     u8 gameFlag = IsCaptainShootToScorePresentationOn();
     if (!gameFlag)
         DrawableCharacter::sSTSLighting = false;
