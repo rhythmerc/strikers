@@ -284,6 +284,62 @@ From melee-pc `platforms/android`, `tools/build_android.sh` and
    on the display period, and SpaceWarp at half rate as a fallback.
 7. **Spatial audio** through MusyX `snd3d` with the headset listener.
 
+### Step 3 results (2026-10-19, Quest 3)
+
+**The gate is met:** a match plays at the display rate on the virtual screen
+at both 72 and 90 Hz. Each figure below is from one 60 s benchmark demo match
+(Wario Stadium, seed 1) with warm shader caches. The flat frame is shown on
+Aurora's virtual screen.
+
+| | 72 Hz | 90 Hz |
+|---|---|---|
+| Presented | 72.02 fps | 90.01 fps |
+| Fresh screen frames from the XR layer | 72.0/s | 90.0/s |
+| Game thread busy, mean / p95 | 2.14 / 2.97 ms | 1.89 / 2.46 ms |
+| Present/drain, mean / p95 | 3.65 / 6.49 ms | 3.81 / 5.88 ms |
+| Frame budget | 13.9 ms | 11.1 ms |
+
+**Notes on these numbers:**
+
+- The CPU budget isn't the problem the frame-rate section feared: the game
+  thread uses under a quarter of the frame at 90 Hz.
+- **Cores:** the Quest 3's six cores are all Cortex-A78C (`0xd4b`), so the
+  build uses `-mcpu=cortex-a78c` for the whole tree, with ThinLTO and
+  contract=fast from step 2.
+- **Pacing:** the game runs its own limiter at the headset's rate
+  (`fps_limit`). It isn't locked to the XR loop yet:
+  - At 72 Hz the XR loop never waited for a frame.
+  - At 90 Hz it waited for the screen image on every display frame (up to
+    9.2 ms) but never went without one.
+  - Locking the game to `xrWaitFrame` is still the plan from section 4. Until
+    then, a game hitch shows as a missed display frame.
+- **Staging pool:** the Android `storage` pool went from 16 to 32 MiB. One
+  match start needed 16.8 MiB and aborted. Strikers stages far more vertex
+  data than Melee, and Android's CPU vertex decode adds to it. The steady peak
+  is 11.7 MiB, cold or warm; the 16.8 MiB frame hasn't recurred.
+- **Texture uploads:** they reach the 12 MiB pool's cap and fall back to
+  one-off buffers, which is handled.
+
+**What it took** (the runbook is `smstrikers-port/tools/android/README.md`):
+
+- **Packaging:** `libstrikers.so` entered through Aurora's `SDL_main`, one
+  immersive activity (no 2D launcher panel yet), and `tools/android/build.sh`
+  using NDK r29, the `rhythmerc/dawn` fork and the OpenXR loader.
+- **Data and settings:** "beside the game" is the app's external files
+  directory, so the disc image, `strikers.ini` (including `AURORA_*` keys)
+  and `frames.csv` all live there.
+- **Logs:** stdout and stderr go to logcat.
+- **Input:** the Touch controllers are merged into port 0 with the port's
+  other synthetic input.
+- **Android-specific fixes:**
+  - The game's `include/malloc.h` re-entered bionic's `<stdlib.h>`.
+  - Bionic has no `backtrace()` before API 33, so the crash handler is off
+    and debuggerd's tombstones take its place.
+  - Movies and Discord are off.
+
+**Not yet verified:** the Touch controllers by hand, and audio. Both need
+someone in the headset.
+
 ## 8. Open questions and risks
 
 - **CPU at 72/90 Hz on the XR2 Gen 2.** This decides whether section 4's

@@ -26,6 +26,10 @@ extern "C" void PortUpdateSyntheticInput(unsigned long frame) { (void)frame; }
 #include "port/input.h"
 #include "port/overlay.h"
 
+#if defined(AURORA_ENABLE_OPENXR)
+#include <aurora/xr.h>
+#endif
+
 namespace
 {
 
@@ -1053,6 +1057,25 @@ extern "C" void PortUpdateSyntheticInput(unsigned long frame)
         s_menuStickFrames--;
     }
     held |= fake_key_state(frame, &lx, &ly, &rx, &ry, &tl, &tr);
+
+#if defined(AURORA_ENABLE_OPENXR)
+    // The headset's controllers, as a GameCube pad that Aurora's XR thread keeps current. Merged
+    // here rather than handed to PAD as a pad of their own, so they share port 0 with everything
+    // else above instead of displacing it.
+    {
+        PADStatus xr;
+        if (aurora_xr_get_pad(&xr))
+        {
+            held |= xr.button;
+            lx += xr.stickX;
+            ly += xr.stickY;
+            rx += xr.substickX;
+            ry += xr.substickY;
+            tl = xr.triggerLeft > tl ? xr.triggerLeft : tl;
+            tr = xr.triggerRight > tr ? xr.triggerRight : tr;
+        }
+    }
+#endif
 
     // The debug menu detaches the keyboard, so a neutral virtual pad keeps port 0 connected.
     const bool menuHasKeyboard = PortOverlayMenuOpen() && PortInputKeyboardEnabled();

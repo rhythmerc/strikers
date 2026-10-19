@@ -257,8 +257,8 @@ int main() { std::jthread t([](std::stop_token) {}); }
 
     add_subdirectory(extern/aurora EXCLUDE_FROM_ALL)
 
-    # The Switch has no Discord client.
-    if(NOT NX)
+    # The Switch and the Quest have no Discord client.
+    if(NOT NX AND NOT ANDROID)
         add_subdirectory(extern/borealis EXCLUDE_FROM_ALL)
     endif()
 
@@ -365,7 +365,7 @@ set_target_properties(strikers_operators PROPERTIES
 # borealis headers need C++20, so discord.cpp is a target of its own.
 list(REMOVE_ITEM PLATFORM_SOURCES
      "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/discord.cpp")
-if(STRIKERS_AURORA AND NOT NX)
+if(STRIKERS_AURORA AND NOT NX AND NOT ANDROID)
     add_library(strikers_discord OBJECT
          "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/discord.cpp")
     set_target_properties(strikers_discord PROPERTIES
@@ -398,6 +398,20 @@ if(NX)
 else()
     list(FILTER PLATFORM_SOURCES EXCLUDE REGEX "/src/platform/switch/")
 endif()
+
+if(ANDROID)
+    # Generated per build directory, as on the Switch: the Android link has its own set, and the
+    # tree's copy is the desktop's.
+    list(REMOVE_ITEM PLATFORM_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/stubs_generated.c")
+    set(_android_stubs "${CMAKE_CURRENT_BINARY_DIR}/stubs_generated.c")
+    if(NOT EXISTS "${_android_stubs}")
+        file(WRITE "${_android_stubs}" "// Filled by tools/android/build.sh.\n")
+    endif()
+    # No Discord client on the Quest; the Switch's no-op definitions are the same ones.
+    list(APPEND PLATFORM_SOURCES "${_android_stubs}"
+         "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/switch/discord.c")
+endif()
+# src/platform/android_log.c compiles to nothing elsewhere.
 
 if(STRIKERS_AURORA)
     # Aurora implements PAD (SDL_Gamepad, GC adapters, rumble, remapping) far better than the
@@ -495,7 +509,14 @@ endif()
 
 # The link test. Aurora, MusyX and the THP decoder are not wired up, so tools/genstubs.py supplies
 # an abort-on-call definition for each symbol they would provide.
-add_executable(strikers
+# On Android the game is libstrikers.so, which SDLActivity loads and enters through SDL_main
+# (Aurora's lib/main.cpp).
+if(ANDROID)
+    add_library(strikers SHARED)
+else()
+    add_executable(strikers)
+endif()
+target_sources(strikers PRIVATE
     $<TARGET_OBJECTS:strikers_game>
     $<TARGET_OBJECTS:strikers_ode>
     $<TARGET_OBJECTS:strikers_sdk>
@@ -549,6 +570,9 @@ if(NX AND NOT EXISTS "${_ff_switch}/lib/libavcodec.a"
    AND NOT EXISTS "$ENV{DEVKITPRO}/portlibs/switch/lib/libavcodec.a")
     set(_strikers_ffmpeg_default OFF)
     message(STATUS "THP movies: off; `tools/build-ffmpeg.sh --switch` builds the decoder")
+elseif(ANDROID)
+    # No Android FFmpeg build yet; the game skips its movies without one.
+    set(_strikers_ffmpeg_default OFF)
 else()
     set(_strikers_ffmpeg_default ON)
 endif()
@@ -732,7 +756,11 @@ elseif(NOT MSVC AND NOT NX)
     file(WRITE "${_local_ops}" "{ local: _Znw*; _Zna*; _ZdlPv*; _ZdaPv*; };\n")
     target_link_options(strikers PRIVATE "-Wl,--version-script=${_local_ops}")
     # A bundled libstdc++ breaks Mesa's LLVM, so it is linked in; glibc 2.41 refuses executable stacks.
-    target_link_options(strikers PRIVATE -static-libstdc++ -static-libgcc -Wl,-z,noexecstack)
+    # The NDK links its own libc++ statically already.
+    if(NOT ANDROID)
+        target_link_options(strikers PRIVATE -static-libstdc++ -static-libgcc)
+    endif()
+    target_link_options(strikers PRIVATE -Wl,-z,noexecstack)
 endif()
 
 if(STRIKERS_AURORA)
@@ -743,6 +771,14 @@ if(STRIKERS_AURORA)
 
     # Frame capture lives inside Aurora now (lib/aurora.cpp, namespace capture).
 
+endif()
+
+if(ANDROID)
+    # liblog for src/platform/android_log.c.
+    target_link_libraries(strikers PRIVATE log android)
+    # SDLActivity looks SDL_main up by name, and in a shared library nothing references it, so
+    # without this the archive member holding it (Aurora's lib/main.cpp) is never linked in.
+    target_link_options(strikers PRIVATE -Wl,--undefined=SDL_main)
 endif()
 
 if(NX)

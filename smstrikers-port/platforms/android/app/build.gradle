@@ -1,0 +1,47 @@
+plugins {
+    id 'com.android.application'
+}
+
+// The Java halves of SDL and Aurora come from the sources the native build used, so they cannot
+// drift from it: tools/android/build.sh reads both directories out of the CMake cache
+// (AURORA_SDL3_JAVA_SOURCE_DIR, AURORA_ANDROID_JAVA_SOURCE_DIR) and passes them in.
+def sdlJava = project.findProperty('strikers.sdlJava')
+def auroraJava = project.findProperty('strikers.auroraJava')
+if (sdlJava == null || auroraJava == null) {
+    throw new GradleException('Build through tools/android/build.sh: it passes -Pstrikers.sdlJava and -Pstrikers.auroraJava')
+}
+
+android {
+    namespace 'dev.strikers.game'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'dev.strikers.game'
+        minSdk 29
+        targetSdk 34
+        versionCode 1
+        versionName '0.1.0'
+
+        ndk {
+            abiFilters 'arm64-v8a'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+        debug {
+            debuggable true
+        }
+    }
+
+    sourceSets {
+        main.java.srcDirs += [sdlJava, auroraJava]
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

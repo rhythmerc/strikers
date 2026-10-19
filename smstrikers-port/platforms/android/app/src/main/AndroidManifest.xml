@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Meta Quest, immersive only: the game is shown on a virtual screen over passthrough through
+     OpenXR (extern/aurora/lib/xr). There is no 2D launcher panel yet; the disc and settings come
+     from /sdcard/Android/data/dev.strikers.game/files (see tools/android/README.md). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.hardware.vulkan.level" android:version="1" android:required="true" />
+    <uses-feature android:name="android.hardware.vr.headtracking" android:version="1" android:required="true" />
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+    <!-- Meta only exposes XR_FB_passthrough to apps that declare this. -->
+    <uses-feature android:name="com.oculus.feature.PASSTHROUGH" android:required="false" />
+    <uses-feature android:name="oculus.software.handtracking" android:required="false" />
+    <uses-permission android:name="com.oculus.permission.HAND_TRACKING" />
+    <uses-permission android:name="com.oculus.permission.BOUNDARY_VISIBILITY" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <uses-permission android:name="org.khronos.openxr.permission.OPENXR" />
+    <uses-permission android:name="org.khronos.openxr.permission.OPENXR_SYSTEM" />
+
+    <queries>
+        <provider android:authorities="org.khronos.openxr.runtime_broker;org.khronos.openxr.system_runtime_broker" />
+        <intent><action android:name="org.khronos.openxr.OpenXRRuntimeService" /></intent>
+        <intent><action android:name="org.khronos.openxr.OpenXRApiLayerService" /></intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:hardwareAccelerated="true"
+        android:appCategory="game"
+        android:icon="@mipmap/icon"
+        android:label="@string/app_name"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+
+        <meta-data android:name="com.oculus.supportedDevices" android:value="quest2|questpro|quest3|quest3s" />
+
+        <activity
+            android:name="dev.strikers.StrikersActivity"
+            android:launchMode="singleTask"
+            android:exported="true"
+            android:screenOrientation="landscape"
+            android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="com.oculus.intent.category.VR" />
+                <category android:name="org.khronos.openxr.intent.category.IMMERSIVE_HMD" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

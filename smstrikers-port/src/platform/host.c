@@ -162,6 +162,9 @@ int port_setenv_default(const char* name, const char* value)
 #if defined(__APPLE__)
 #include <mach-o/dyld.h>
 #endif
+#if defined(__ANDROID__)
+#include <stdio.h>
+#endif
 
 unsigned long long port_monotonic_ns(void)
 {
@@ -244,6 +247,27 @@ int port_executable_dir(char* buf, size_t size)
     if (strlen(resolved) >= size)
         return -1;
     strcpy(buf, resolved);
+#elif defined(__ANDROID__)
+    // An app has no directory of its own beside its code that a person can reach, so "beside the
+    // game" is the app's external files directory, /sdcard/Android/data/<package>/files: adb and a
+    // file manager can put strikers.ini and the disc there, and the app needs no permission to read
+    // it. The package comes from the process name rather than JNI because DVDInit asks before
+    // main, from a static constructor that runs while the library is still loading. A ":xr" style
+    // process suffix is not part of the package.
+    char name[256];
+    FILE* f = fopen("/proc/self/cmdline", "rb");
+    if (f == NULL)
+        return -1;
+    const size_t got = fread(name, 1, sizeof name - 1, f);
+    fclose(f);
+    name[got] = '\0';
+    char* colon = strchr(name, ':');
+    if (colon != NULL)
+        *colon = '\0';
+    if (name[0] == '\0')
+        return -1;
+    const int n = snprintf(buf, size, "/sdcard/Android/data/%s/files", name);
+    return (n > 0 && (size_t)n < size) ? 0 : -1;
 #else
     ssize_t n = readlink("/proc/self/exe", buf, size - 1);
     if (n <= 0 || (size_t)n >= size - 1)

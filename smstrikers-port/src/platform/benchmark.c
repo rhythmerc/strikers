@@ -15,6 +15,11 @@ __attribute__((weak)) void aurora_gpu_frame_time(unsigned long long*, unsigned l
 typedef struct { unsigned int queuedPipelines, createdPipelines, drawCallCount, mergedDrawCallCount, lastVertSize, lastUniformSize, lastIndexSize, lastStorageSize, lastTextureUploadSize; } PortAuroraStatsHead;
 __attribute__((weak)) const PortAuroraStatsHead* aurora_get_stats(void);
 
+// Each staging pool's largest per-frame use since boot and its size, weak for the same reason: an
+// overflow is fatal, so how close a run came is worth a line.
+__attribute__((weak)) void aurora_gfx_pool_stats(unsigned int* peakBytes, unsigned int* reservedBytes,
+                                                 size_t count);
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -520,6 +525,21 @@ void PortBenchReport(void)
         }
         fprintf(stderr, "  pipelines       %zu created in %zu frames; of %zu frames over 20 ms, %zu created one\n",
                 compiled, compileFrames, longFrames, longWithCompile);
+    }
+    // In aurora_gfx_pool_stats' order. Peaks are since boot, the front end included.
+    if (aurora_gfx_pool_stats)
+    {
+        static const char* const kPools[] = { "vertex", "uniform", "index", "storage", "texture" };
+        unsigned int peak[5] = { 0 }, reserved[5] = { 0 };
+        size_t i;
+        aurora_gfx_pool_stats(peak, reserved, 5);
+        fprintf(stderr, "  pool peak MiB  ");
+        for (i = 0; i < 5; i++)
+        {
+            if (reserved[i] != 0)
+                fprintf(stderr, " %s %.1f/%.0f", kPools[i], peak[i] / 1048576.0, reserved[i] / 1048576.0);
+        }
+        fprintf(stderr, "\n");
     }
 
     if (s_dropped)

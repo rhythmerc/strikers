@@ -90,8 +90,9 @@ static int env_name(const char* key, char* out, size_t size)
         return -1;
 
     prefixed = has_prefix(key, n, PORT_CONFIG_PREFIX);
-#if defined(__SWITCH__)
-    // Allow Aurora settings in strikers.ini without adding the STRIKERS_ prefix.
+#if defined(__SWITCH__) || defined(__ANDROID__)
+    // Allow Aurora settings in strikers.ini without adding the STRIKERS_ prefix. On these the file is
+    // the only way to set them: neither a homebrew launcher nor `am start` passes an environment.
     prefixed = prefixed || has_prefix(key, n, "AURORA_");
 #endif
 

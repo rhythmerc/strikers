@@ -27,3 +27,8 @@ __pycache__/
 
 
 *.log
+# Android build outputs (tools/android/build.sh).
+smstrikers-port/platforms/android/.gradle/
+smstrikers-port/platforms/android/local.properties
+smstrikers-port/platforms/android/app/build/
+smstrikers-port/platforms/android/app/src/main/jniLibs/

@@ -10,9 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if defined(__SWITCH__)
+#if defined(__SWITCH__) || defined(__ANDROID__)
 
-// Horizon has no signals and newlib no execinfo; Atmosphere writes the crash report instead.
+// Horizon has no signals and newlib no execinfo; Atmosphere writes the crash report instead. On
+// Android debuggerd writes a symbolised tombstone, and bionic has no backtrace() before API 33.
 
 #elif !defined(_WIN32)
 
