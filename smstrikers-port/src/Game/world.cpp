@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "port/input.h"
+#include "port/xr.h"
 #include "NL/nlString.h"
 #include "NL/vmath.h"
 #include "Game/World.h"
@@ -1156,6 +1157,20 @@ void World::ExtractFrustumPlanes()
         m_frustumPlane[5].y /= length;
         m_frustumPlane[5].z /= length;
         m_frustumPlane[5].w /= length;
+    }
+
+    // PORT: XR. The 3D view sees the whole pitch, whatever the game camera does; only what it cuts
+    // away is outside.
+    float xrPlanes[6][4];
+    if (PortXrCullPlanes(xrPlanes))
+    {
+        for (int i = 0; i < 6; i++)
+        {
+            m_frustumPlane[i].x = xrPlanes[i][0];
+            m_frustumPlane[i].y = xrPlanes[i][1];
+            m_frustumPlane[i].z = xrPlanes[i][2];
+            m_frustumPlane[i].w = xrPlanes[i][3];
+        }
     }
 }
 

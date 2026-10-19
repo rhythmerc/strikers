@@ -340,6 +340,97 @@ Aurora's virtual screen.
 **Not yet verified:** the Touch controllers by hand, and audio. Both need
 someone in the headset.
 
+**Since verified by hand:** audio is right. The controllers needed fixes:
+- The Touch merge had been compiled out, because `AURORA_ENABLE_OPENXR` never
+  reached the game code.
+- The keyboard pad held port 0, so it's now off by default on Android.
+- A gamepad now moves to port 0 in XR, as melee-pc does: SDL counts the
+  Quest's own input devices, so a lone pad landed on port 1.
+
+### Step 4 results (2026-10-19, Quest 3)
+
+**The gate is met at 72 Hz:** a demo match on Wario Stadium plays in 3D on a
+1 m pitch at a steady 72.0 frames a second. At 90 Hz, 3D reaches 53–62 fps.
+Each figure is a mean over the 10 s windows that were all 3D, from 90 s
+benchmark demo matches (seed 1), with dynamic resolution off.
+
+| | 72 Hz | 90 Hz | 90 Hz, no MSAA |
+|---|---|---|---|
+| 3D frames released | 72.0/s | 53.3/s | 62.1/s |
+| GPU, both eyes in one multiview pass | 9.5 ms | 9.2 ms | 7.5 ms |
+| Frame budget | 13.9 ms | 11.1 ms | 11.1 ms |
+
+**How it's built** (`smstrikers-port/src/platform/xr_scene.cpp`,
+`include/port/xr.h`):
+
+- **Which frames are 3D:** the top camera decides. Live-play cameras
+  (gameplay, follow, kickoff, top-down, the strike cameras and the goal
+  camera) show the match in 3D. Replays, animated cut-scenes and face
+  close-ups stay on the virtual screen.
+- **Per view:** as each of the 34 views goes out (`glx_SendViews`), it is
+  tagged world, HUD, hidden or mono:
+  - **Hidden:** the skybox and the screen-space passes.
+  - **HUD plane:** Anark, the front end and the transitions.
+  - **Mono:** shadow textures stay in the flat frame, where world draws read
+    them.
+- **Axes:** Strikers is z-up, and Aurora's arena logic is y-up. Each world
+  view matrix goes to Aurora with the turn folded in, so Aurora needs no
+  change for it.
+- **Stands (the near-half rule):** for each side of the pitch the head is
+  beyond, everything 2 units past that side's line is cut, with a 1.5-unit
+  dithered edge. Everything over 8 units high (domes, cage walls) is cut too.
+  The same planes replace the game's frustum planes in 3D frames, so objects
+  wholly inside a cut are never drawn: 846 world draws a frame down to 695.
+  Without that culling the eyes cost 1–3 ms more.
+- **Pause:** the pause menu marks the match paused, so the hands can grab
+  the pitch to move, turn or scale it.
+
+**What limits 90 Hz:**
+
+- **GPU per draw, not per pixel:**
+  - The eye pass cost about the same at a 0.7 resolution scale as at 1.0.
+  - Vertices are few, about 130k a frame.
+  - The stadium view's 526 world draws cost 3.3 ms, about 6 µs each, which
+    matches melee-pc's figure.
+  - Fewer draws (batching, merged stadium meshes) is the lever.
+- **The image hand-over:** the render worker waited over 2 ms for a 3D image
+  about 440 times in 10 s. In direct mode, the XR thread releases a finished
+  image and acquires the next only once per display frame. That suits a game
+  ticked by that loop (Melee) and costs Strikers frames. Staged images made
+  it worse (the display fell to 49 fps). This is step 6's pacing work.
+
+**Aurora changes** (on `strikers`):
+- **Dynamic resolution:** for a game on its own timer, it now budgets against
+  one display frame, not Melee's 60 Hz tick. It may also go below native
+  resolution without SpaceWarp.
+
+**Android defaults** (set after `strikers.ini`, so the file still wins):
+- 72 Hz, with the game's limiter to match.
+- SpaceWarp off: every display frame is fresh, so it only added a 1.8 ms
+  motion pass.
+- A dynamic resolution floor of 0.7.
+
+**Known gaps, next:**
+- **The jumbotron:** replays and cut-scenes on a screen in the stadium. Some
+  stadium meshes already carry jumbotron screens (`Jumbotron.cpp` drives
+  them with canned clips). But during a replay the game rewinds the world
+  itself, so the 3D pitch would replay too. That needs a design decision.
+- **Player dissolve** between goal and kickoff
+  (`aurora_xr_world_clips4_fade`).
+- **Other stadiums:** the roof height and stand margin are one setting for
+  every stadium for now (`xr_roof`, `xr_stand_margin`); step 5 sets them per
+  stadium.
+- `DoTranslucency` fades objects that block the game camera's view. In 3D
+  that camera isn't the viewer, so the fade may be wrong. Not yet checked.
+- `AURORA_XR_BINDLESS=0` dies on a WGSL extension error. It's off the default
+  path, so it isn't fixed.
+
+**Debug settings:**
+- `xr_hide` (eGLView numbers): leaves views out of 3D, to measure each one's
+  cost.
+- `probe_views`: logs packets and vertices per view.
+- `xr_flat`: keeps matches on the screen.
+
 ## 8. Open questions and risks
 
 - **CPU at 72/90 Hz on the XR2 Gen 2.** This decides whether section 4's

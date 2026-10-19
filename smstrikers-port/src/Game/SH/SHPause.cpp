@@ -1,4 +1,5 @@
 #include "Game/SH/SHPause.h"
+#include "port/xr.h"
 #include "Game/OverlayManager.h"
 #include "Game/SH/SHLessonSelect.h"
 
@@ -56,6 +57,7 @@ PauseMenuScene::PauseMenuScene(PauseMenuScene::ScreenContext context)
     , mButtons2()
 {
     mDelayBeforeUnpause = 0.1f;
+    PortXrPauseMenu(1);   // PORT: XR
 }
 
 /**
@@ -63,6 +65,7 @@ PauseMenuScene::PauseMenuScene(PauseMenuScene::ScreenContext context)
  */
 PauseMenuScene::~PauseMenuScene()
 {
+    PortXrPauseMenu(0);   // PORT: XR
 }
 
 /**

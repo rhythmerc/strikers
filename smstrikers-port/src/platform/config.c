@@ -257,6 +257,15 @@ int PortConfigLoad(void)
         return s_applied;
 
     s_applied = load_config();
+#if defined(__ANDROID__)
+    // The headset's defaults, under whatever the file set. The game draws a fresh frame every
+    // display frame, so Aurora's SpaceWarp (built for Melee's 60 Hz game) would only add a pass;
+    // the 3D match holds 72 Hz on the Quest 3 and not yet 90 (docs/research-baseline.md, step 4).
+    port_setenv_default("AURORA_XR_REFRESH", "72");
+    port_setenv_default("STRIKERS_FPS_LIMIT", "72");
+    port_setenv_default("AURORA_XR_APPSW", "0");
+    port_setenv_default("AURORA_XR_DYNRES_MIN", "0.7");
+#endif
     // After the file, not before: `log` is a key like any other, and a player asked to turn logging
     // on will put it in strikers.ini rather than set an environment variable.
     open_log();

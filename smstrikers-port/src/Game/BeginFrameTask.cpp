@@ -27,7 +27,9 @@
 #include "Game/Game.h"
 #include "Game/GameInfo.h"
 #include "Game/WorldManager.h"
+#include "Game/Field.h"
 #include "port/aspect.h"
+#include "port/xr.h"
 
 static inline float GetAspectRatio()
 {
@@ -204,6 +206,11 @@ void SetupMatrices()
         pCamera = nlDLRingGetStart<cBaseCamera>(cCameraManager::m_cameraStack);
         cCameraManager::m_pBeginFrameCameraType = pCamera->GetType();
     }
+
+    // PORT: XR. Whether this frame shows the match in 3D, before anything culls against the camera.
+    PortXrBeginFrame(cCameraManager::m_pBeginFrameCameraType,
+                     WorldManager::s_World != NULL ? (int)GameInfoManager::Instance()->GetStadium() : -1,
+                     cField::GetFieldPosition().x, cField::GetFieldPosition().y);
 
     glViewSetViewMatrix(GLV_Skybox, hCamView);
     glViewSetViewMatrix(GLV_Shadowed, hCamView);

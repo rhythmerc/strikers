@@ -4,6 +4,8 @@
 #include "NL/gl/glState.h"
 #include "NL/gl/glPlat.h"
 #include "port/aspect.h"
+#include "port/xr.h"
+#include "NL/glx/glxMatrix.h"
 #include "NL/gl/glConstant.h"
 #include "NL/gl/glFont.h"
 #include "NL/gl/glDraw2.h"
@@ -361,6 +363,16 @@ static void glx_SendViews()
             continue;
         }
 
+        // PORT: XR. The view's category in a 3D frame, and the camera its world draws were seen from.
+        if (PortXr3D())
+        {
+            nlMatrix4 mView;
+            float gxView[3][4];
+            glViewGetViewMatrix((eGLView)view, mView);
+            glxCopyMatrix(gxView, mView);
+            PortXrSendView(view, gxView);
+        }
+
         fenceMetricPending = 0;
         do
         {
@@ -485,6 +497,7 @@ static void glx_SendViews()
         }
     }
 
+    PortXrEndViews();
     glx_SendEnd();
     if (glx_ViewFence < 0)
     {

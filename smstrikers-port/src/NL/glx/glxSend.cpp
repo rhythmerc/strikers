@@ -2,6 +2,7 @@
 #include "port/texfilter.h"
 #include "port/aspect.h"
 #include "port/probeobj.h"
+#include "port/input.h"
 #include "dolphin/os.h"
 #include "port/endian.h"
 #include <stdlib.h>
@@ -2661,6 +2662,28 @@ static inline void glx_SwitchMatrix(const glModelPacket* p)
  */
 void glx_SendFrame_cb(eGLView view, unsigned long flags, const glModelPacket* p)
 {
+    // PORT: STRIKERS_PROBE_VIEWS: packets and vertices sent through each view, every 300 frames.
+    {
+        static const bool bProbeViews = getenv("STRIKERS_PROBE_VIEWS") != NULL;
+        static unsigned long nPackets[GLV_Num], nVertices[GLV_Num], nLast;
+        if (bProbeViews && p != NULL && view < GLV_Num)
+        {
+            nPackets[view]++;
+            nVertices[view] += p->numVertices;
+            if (PortInputFrame() - nLast >= 300)
+            {
+                nLast = PortInputFrame();
+                for (int v = 0; v < GLV_Num; v++)
+                {
+                    if (nPackets[v] != 0)
+                        OSReport("[views] view %2d: %6lu packets, %8lu vertices a frame\n", v,
+                                 nPackets[v] / 300, nVertices[v] / 300);
+                    nPackets[v] = nVertices[v] = 0;
+                }
+            }
+        }
+    }
+
     if (p != NULL)
     {
         if (glx_DirtyFlags != 0)

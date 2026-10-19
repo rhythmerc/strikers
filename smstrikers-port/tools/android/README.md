@@ -48,12 +48,19 @@ then stops, because there is no disc yet.
 - **Saves and caches:** these live in the app's internal storage
   (`run-as dev.strikers.game ls files`).
 
-Useful settings:
+Useful settings (the first two default to 72 here, where a 3D match holds full rate):
 
 ```ini
-AURORA_XR_REFRESH = 90     # 72, 80, 90 or 120; Aurora otherwise picks 120
+AURORA_XR_REFRESH = 90     # 72, 80, 90 or 120
 fps_limit = 90             # the game's limiter, at the headset's rate
+xr_pitch = 1.0             # the 3D pitch's length on the table, in metres
+xr_roof = 8                # game units: everything higher is cut from the 3D view
+xr_stand_margin = 2        # game units past a near touchline or goal line where the stands are cut
+xr_flat = 1                # matches on the virtual screen instead of in 3D
 ```
+
+Matches are in 3D while the camera follows live play. Replays and cut-scenes stay on the screen.
+Pause to grab the pitch and move, turn or scale it.
 
 ## Measure
 
