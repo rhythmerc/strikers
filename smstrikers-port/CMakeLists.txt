@@ -34,6 +34,57 @@ option(STRIKERS_ASAN "Build with AddressSanitizer" OFF)
 # symbols over WebGPU and SDL3.
 option(STRIKERS_AURORA "Build against Aurora (real GX/PAD/CARD/DVD)" ON)
 
+# Code generation. Nothing in the port needs two builds to compute bit-identical floats: there is no
+# netplay, replays play back recorded RenderSnapshots rather than re-simulating, and
+# STRIKERS_FIXED_DT only promises that one binary repeats itself. So these trade bit-exactness
+# between builds for speed. Set ahead of add_subdirectory(extern/aurora) so Aurora and SDL get them
+# too. On by default only where they have been measured: Linux, and Android, which shares its
+# toolchain.
+if(CMAKE_SYSTEM_NAME MATCHES "^(Linux|Android)$" AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(_strikers_codegen_default ON)
+else()
+    set(_strikers_codegen_default OFF)
+endif()
+# ThinLTO across the game, NL, ODE, the SDK math and src/platform; see the strikers target for why it
+# stops there.
+option(STRIKERS_LTO "ThinLTO across the game side of the executable" ${_strikers_codegen_default})
+# clang's default, `on`, fuses a multiply-add only within one expression; `fast` also fuses across
+# statements. A no-op on baseline x86-64, which has no FMA; AArch64 always has it. Netplay between
+# identical binaries is unaffected; netplay across platforms needs `off` on the simulation targets
+# (game, ODE, SDK math) plus its own libm, whatever this is set to.
+option(STRIKERS_FP_CONTRACT_FAST "-ffp-contract=fast" ${_strikers_codegen_default})
+# The NDK turns -fstack-protector-strong on by default, a canary check in every function with an
+# array on its stack, which in this tree is most of the renderer and the physics.
+option(STRIKERS_NO_STACK_PROTECTOR "-fno-stack-protector" ${_strikers_codegen_default})
+set(STRIKERS_TARGET_CPU "" CACHE STRING
+    "CPU to generate code for: -mcpu on ARM, -march elsewhere. Empty leaves the toolchain default.")
+
+if(NOT MSVC)
+    add_compile_options(
+        $<$<BOOL:${STRIKERS_FP_CONTRACT_FAST}>:-ffp-contract=fast>
+        $<$<BOOL:${STRIKERS_NO_STACK_PROTECTOR}>:-fno-stack-protector>)
+    if(STRIKERS_TARGET_CPU)
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64|arm.*)$")
+            add_compile_options(-mcpu=${STRIKERS_TARGET_CPU})
+        else()
+            add_compile_options(-march=${STRIKERS_TARGET_CPU})
+        endif()
+    endif()
+endif()
+if(STRIKERS_LTO)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT _strikers_ipo OUTPUT _strikers_ipo_why LANGUAGES C CXX)
+    if(NOT _strikers_ipo)
+        # Usually llvm-ar missing, or cached as missing from before it was installed.
+        message(WARNING "STRIKERS_LTO: this toolchain cannot do LTO, building without it. "
+                        "CMAKE_C_COMPILER_AR=${CMAKE_C_COMPILER_AR}\n${_strikers_ipo_why}")
+        set(STRIKERS_LTO OFF)
+    elseif(NOT MSVC AND NOT APPLE)
+        # GNU ld reads LLVM bitcode only through a plugin; lld is what the NDK links with anyway.
+        add_link_options(-fuse-ld=lld)
+    endif()
+endif()
+
 # include/msl links only the Metrowerks headers whose names do not collide with host ones, so
 # <stdio.h>, <math.h> and the rest resolve to the host.
 set(PORT_INCLUDES
@@ -453,6 +504,15 @@ add_executable(strikers
     $<TARGET_OBJECTS:strikers_musyx>
 )
 target_link_libraries(strikers PRIVATE port_flags)
+# Only the targets that share port_flags. They compile with -fshort-wchar, the console's 2-byte
+# wchar_t, and LLVM will not import a function between modules that disagree on wchar_t's size, so
+# Aurora, MusyX and the libraries stay native objects. Taking the boundary down to Aurora means the
+# game's wchar_t becoming char16_t.
+if(STRIKERS_LTO)
+    set_target_properties(strikers_ode strikers_game strikers_platform strikers_sdk
+                          strikers_operators strikers
+        PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
+endif()
 if(TARGET strikers_discord)
     target_sources(strikers PRIVATE $<TARGET_OBJECTS:strikers_discord>)
     target_link_libraries(strikers PRIVATE borealis::discord)

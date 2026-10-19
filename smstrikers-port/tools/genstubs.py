@@ -234,6 +234,9 @@ def undefined():
     if not objs:
         sys.exit("no objects; run: cmake --build build")
     nm_tool, nm_args, nm_undef, nm_def = _nm()
+    # --no-llvm-bc is for the prebuilt archives; under STRIKERS_LTO every object here is bitcode, and
+    # skipping them all finds nothing undefined.
+    nm_args = [a for a in nm_args if a != "--no-llvm-bc"]
     defined = _nm_symbols(nm_tool, nm_args, nm_def, objs)
     return sorted(_nm_symbols(nm_tool, nm_args, nm_undef, objs) - defined), defined
 

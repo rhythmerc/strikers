@@ -30,11 +30,14 @@ if [ "$VERSION_CODENAME" = jammy ]; then
         $SUDO tee /etc/apt/sources.list.d/llvm-18.list > /dev/null
     $SUDO apt-get update
     # g++-12 for its libstdc++: clang uses the newest GCC it finds, and 11's <ranges> is too old.
-    $SUDO apt-get install -y --no-install-recommends clang-18 lld-18 g++-12
+    # llvm-18 for llvm-ar and llvm-nm: STRIKERS_LTO archives LLVM bitcode, and tools/genstubs.py
+    # reads it.
+    $SUDO apt-get install -y --no-install-recommends clang-18 lld-18 llvm-18 g++-12
     $SUDO update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
     $SUDO update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
+    $SUDO update-alternatives --install /usr/bin/llvm-nm llvm-nm /usr/bin/llvm-nm-18 100
     # Jammy's CMake 3.22 is below Aurora's minimum.
     $SUDO python3 -m pip install --no-cache-dir 'cmake==3.31.6'
 else
-    $SUDO apt-get install -y --no-install-recommends clang lld cmake
+    $SUDO apt-get install -y --no-install-recommends clang lld llvm cmake
 fi

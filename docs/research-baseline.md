@@ -189,6 +189,53 @@ correctness:
   cache and `ByteBuffer`), and G2 (stricter eye-batch reordering). These are
   all in Aurora and shared.
 
+### Step 2 results (2026-10-19, desktop x86-64)
+
+- **Flags now on by default (Linux and Android):**
+  - `STRIKERS_FP_CONTRACT_FAST`, `STRIKERS_NO_STACK_PROTECTOR` and
+    `STRIKERS_LTO`.
+  - `STRIKERS_TARGET_CPU` is empty by default. The Android build sets it once
+    the Quest's cores are read (`-mcpu`).
+  - `-O3` was already the Release default. Aurora pinned no flags of its own:
+    melee-pc's `-O2` and contract=off pins lived in melee-pc's CMake.
+- **ThinLTO stops at Aurora.** The game compiles with `-fshort-wchar` (the
+  console's 2-byte `wchar_t`, used in 131 files). LLVM won't import functions
+  between modules that disagree on `wchar_t` size, so LTO covers only the game,
+  NL, ODE, the SDK math and `src/platform`. Taking it across into Aurora means
+  converting the game to `char16_t`.
+- **Build fixes for LTO:**
+  - `tools/genstubs.py` no longer passes `--no-llvm-bc` when reading the
+    build's own objects. Under LTO those objects are bitcode, so it found no
+    undefined symbols and wrote no stubs.
+  - The Linux deps script now installs `llvm` for `llvm-ar` and `llvm-nm`.
+    Without them, configure warns and builds without LTO.
+- **Timing.** Main-thread CPU per match frame, fixed seed and timestep,
+  3 × 60 s per build run in rotation:
+
+  | Build | mean | p95 | Per-run means (µs) |
+  |---|---|---|---|
+  | Baseline (all off) | 628 | 852 | 621, 615, 647 |
+  | ThinLTO | 599 | 817 | 595, 607, 595 |
+  | ThinLTO + x86-64-v3 | 595 | 822 | 586, 599, 599 |
+  | ThinLTO + x86-64-v3 + contract=fast | 584 | 808 | 569, 593, 592 |
+
+  - ThinLTO is worth 2–4%: every LTO run beat every baseline run.
+  - contract=fast's extra 1–2% (measured with x86-64-v3 standing in for
+    AArch64's FMA) is within run-to-run noise. The real number comes from the
+    Quest.
+  - Neither `x86-64-v3` build plays the same match as the baseline, so their
+    rows compare similar matches, not identical ones.
+- **Correctness:**
+  - With the flags off, frames are pixel-identical to step 1.
+  - The ThinLTO build is pixel-identical to the baseline on all 17 frames
+    captured during a deterministic match.
+  - contract=fast repeats itself exactly run to run. Against the baseline it
+    drifts by a few pixels after about 25 s and plays a different match from
+    about 75 s. Screenshots look normal, and there are no NaNs or asserts.
+- **Netplay.** contract=fast doesn't rule it out. Identical binaries still
+  agree. Cross-platform lockstep would need contract=off on the simulation
+  targets and its own libm, regardless of this flag.
+
 ## 6. Quest build plumbing to carry over
 
 From melee-pc `platforms/android`, `tools/build_android.sh` and
