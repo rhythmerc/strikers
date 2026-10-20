@@ -5,10 +5,12 @@
 #include "Game/CharacterTweaks.h"
 #include "Game/Game.h"
 #include "Game/GameTweaks.h"
+#include "Game/GL/gluMeshWriter.h"
 #include "Game/RenderSnapshot.h"
 #include "Game/Drawable/DrawableCharacter.h"
 #include "Game/Player.h"
 #include "Game/ReplayManager.h"
+#include "NL/gl/gl.h"
 #include "NL/gl/glDraw2.h"
 #include "NL/gl/glState.h"
 #include "NL/gl/glTexture.h"
@@ -17,6 +19,10 @@
 #include "NL/nlColour.h"
 #include "NL/nlMath.h"
 #include "types.h"
+#include "port/xr.h"
+
+#include <math.h>
+#include <stdlib.h>
 
 static float s_fOverheadSize = 35.0f;
 static float s_fAdditiveBlendingIntensity = 0.55f;
@@ -223,6 +229,11 @@ static inline void DrawOffscreenIndicator(const nlVector3& v3NormalizedScreenPos
 static inline void DrawIndicator(int xCentre, int yCentre, float fPixelWidth, float fPixelHeight, float fOpacity, unsigned long uTexID,
     float rotationAngle, unsigned char additiveBlending)
 {
+    // PORT: XR. In a 3D frame this would land on the HUD plane where the game camera puts it, over
+    // nobody, and the eyes see the whole pitch anyway; RenderXrPlayerRings marks the players.
+    if (PortXr3D())
+        return;
+
     if ((u8)glTextureLoad(uTexID))
     {
         glPoly2 poly;
@@ -361,6 +372,131 @@ static void UpdateAndRenderPlayerIndicators(float)
     whoHadBall = whoHasBall;
 }
 
+// PORT: XR. In a 3D frame each human-controlled player gets a ring on the pitch around their feet
+// instead of the number over their head, in that number's colour (fe/controller_N_indicator). Like
+// the number, it closes in from twice its size on a switch, and glows in time with the pulse while
+// its player has the ball. It's sized to the player as drawn (PortXrFigureScale).
+namespace
+{
+
+const unsigned long RingProgram = glGetProgram("3d unlit");
+const unsigned long RingTexture = glGetTexture("global/white");
+
+const unsigned char kRingColour[4][3] = {
+    { 240, 224, 48 },   // 1: yellow
+    { 48, 192, 224 },   // 2: blue
+    { 0, 208, 48 },     // 3: green
+    { 240, 48, 48 },    // 4: red
+};
+
+const int kRingSegments = 48;
+const int kRingBands = 3;   // a dark inner edge, the colour, a dark outer edge fading out
+
+void RingBand(GLMeshWriter& w, const nlVector3& centre, float r0, float r1, const nlColour& c0, const nlColour& c1)
+{
+    const float z = 0.04f;   // just over the pitch, under the feet
+    for (int i = 0; i < kRingSegments; i++)
+    {
+        const float a0 = 6.2831853f * (float)i / kRingSegments;
+        const float a1 = 6.2831853f * (float)(i + 1) / kRingSegments;
+        const float x0 = cosf(a0), y0 = sinf(a0), x1 = cosf(a1), y1 = sinf(a1);
+        const nlVector3 p[4] = {
+            { centre.x + x0 * r0, centre.y + y0 * r0, z },
+            { centre.x + x0 * r1, centre.y + y0 * r1, z },
+            { centre.x + x1 * r1, centre.y + y1 * r1, z },
+            { centre.x + x1 * r0, centre.y + y1 * r0, z },
+        };
+        const nlColour* c[4] = { &c0, &c1, &c1, &c0 };
+        for (int k = 0; k < 4; k++)
+        {
+            w.Colour(*c[k]);
+            w.Texcoord(0.f, 0.f);
+            w.Vertex(p[k]);
+        }
+    }
+}
+
+}   // namespace
+
+static void RenderXrPlayerRings()
+{
+    if (!PortXr3D())
+        return;
+
+    // xr_rings_all (debug): every player gets one, in turn through the four colours, so the rings
+    // can be seen in an AI-only match (the benchmark's, tools/xr-desktop.sh shot).
+    static const bool all = getenv("STRIKERS_XR_RINGS_ALL") != NULL;
+    int players[10];
+    int count = 0;
+    for (int i = 0; i < 10; i++)
+    {
+        if (all || ((cPlayer*)g_pCharacters[i])->GetGlobalPad() != 0)
+            players[count++] = i;
+    }
+    if (count == 0)
+        return;
+
+    glSetDefaultState(true);
+    glSetRasterState(GLS_Culling, 0);
+    glSetRasterState(GLS_AlphaBlend, 1);
+    glSetRasterState(GLS_DepthWrite, 0);
+    glSetCurrentRasterState(glHandleizeRasterState());
+    glSetCurrentTexture(RingTexture, GLTT_Diffuse);
+    glSetCurrentTextureState(glHandleizeTextureState());
+    const unsigned long prevProgram = glSetCurrentProgram(RingProgram);
+
+    static const eGLStream kStreams[3] = { (eGLStream)0, (eGLStream)2, (eGLStream)3 };
+    GLMeshWriter w;
+    if (!w.Begin(count * kRingBands * kRingSegments * 4, GLP_QuadList, 3, kStreams, false))
+    {
+        glSetCurrentProgram(prevProgram);
+        return;
+    }
+
+    const float figure = PortXrFigureScale();
+    for (int n = 0; n < count; n++)
+    {
+        cPlayer* pPlayer = (cPlayer*)g_pCharacters[players[n]];
+        const nlVector3& feet = ReplayManager::Instance()->mRender->GetCharacter(players[n]).mPosition;
+        cGlobalPad* pPad = pPlayer->GetGlobalPad();
+        const unsigned char* rgb = kRingColour[(pPad != NULL ? pPad->m_padIndex : players[n]) & 3];
+
+        float size = figure * (0.3f + 0.6f * pPlayer->m_pTweaks->fPhysCapsuleRadius);
+        float alpha = 1.0f;
+        float glow = 0.0f;
+        if (pPlayer->m_UserControlledTime < 0.5f)
+        {
+            const float t = (0.5f - pPlayer->m_UserControlledTime) / 0.5f;
+            size *= Interpolate(1.0f, 2.0f, t);
+            alpha = 1.0f - 0.6f * t;
+        }
+        else if (pPlayer->m_pBall)
+        {
+            glow = 0.45f * (s_bPulseGlowTexture ? s_fGlowIntensityScale : 1.0f);
+        }
+
+        const float edge = 0.06f * figure;
+        const float band = 0.22f * figure;
+        const auto colour = [&](float k, unsigned char a) {
+            nlColour c;
+            nlColourSet(c, (unsigned char)((rgb[0] + (255 - rgb[0]) * glow) * k), (unsigned char)((rgb[1] + (255 - rgb[1]) * glow) * k),
+                (unsigned char)((rgb[2] + (255 - rgb[2]) * glow) * k), (unsigned char)(a * alpha));
+            return c;
+        };
+        const nlColour clear = colour(0.1f, 0);
+        const nlColour dark = colour(0.1f, 170);
+        const nlColour solid = colour(1.0f, 255);
+        RingBand(w, feet, size - edge, size, clear, dark);
+        RingBand(w, feet, size, size + band, solid, solid);
+        RingBand(w, feet, size + band, size + band + edge, dark, clear);
+    }
+
+    const bool ended = w.End();
+    glSetCurrentProgram(prevProgram);
+    if (ended)
+        glViewAttachModel(GLV_Unshadowed, w.GetModel());   // drawn uncut (xr_scene.cpp, kBoardView)
+}
+
 /**
  * Offset/Address/Size: 0x0 | 0x8015F264 | size: 0xA8
  */
@@ -368,6 +504,7 @@ void UpdateAndRenderIndicators(float dt)
 {
     UpdateAndRenderOffScreenIndicators(dt);
     UpdateAndRenderPlayerIndicators(dt);
+    RenderXrPlayerRings();   // PORT: XR
 
     if (s_bPulseGlowTexture)
     {

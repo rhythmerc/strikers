@@ -481,6 +481,26 @@ benchmark demo matches (seed 1), with dynamic resolution off.
   cost.
 - `probe_views`: logs packets and vertices per view.
 - `xr_flat`: keeps matches on the screen.
+- `xr_rings_all`: puts the active-player ring under every player, so AI-only matches show it.
+
+**Desktop testing against Monado (2026-10-20):** `tools/xr-desktop.sh` builds the OpenXR path
+for the desktop (`build/linux-xr`, in the `melee-xr` distrobox from `~/projects/xr-toolchain`)
+and runs it against Monado's simulated headset.
+- `shot NAME [VAR=value...]` plays the benchmark's demo match unattended and writes the eyes,
+  the HUD and the screen as PNGs under `build/linux-xr/shots/NAME/dump`, about 80 s a shot. The
+  intro cut-scene takes about 50 s of that; the eyes are dumped 5 s into the 3D match.
+- `run` plays in Monado's window (its keys are at the top of `xr-toolchain/bin/xr-sim`).
+- Desktop runs at 60 Hz on one 896x1008 eye per side with no dynamic resolution, so it checks
+  what is drawn, not how fast. The headset stays the reference for performance and the room.
+
+### Active-player ring (2026-10-20)
+
+In 3D the game's overhead number (`fe/controller_N_indicator`) is placed by the flat game camera,
+so it never sat over anyone. Each human-controlled player gets a ring on the pitch around their
+feet instead, in their number's colour: 1 yellow, 2 blue, 3 green, 4 red, read from the textures on
+the disc. It's sized to the player as drawn, closes in from twice its size on a switch, and pulses
+while its player has the ball, as the number did. The overhead numbers and off-screen markers are
+left out of 3D frames; the flat screen keeps them. `src/Game/Render/Indicators.cpp`.
 
 ### Goals for the play space (2026-10-20)
 
@@ -495,6 +515,7 @@ benchmark demo matches (seed 1), with dynamic resolution off.
    dissolve out of the 3D pitch for the replay.
 4. **Active player indicator.** The base game marks the controlled player with an arrow above the
    head, which 3D doesn't show yet and play suffers for it. Use a circle around the feet instead.
+   First version done (above); to tune on the headset.
 5. **Player scale setting, in game.** The draw scale (`xr_figure_scale`, 1.5 for now) becomes an
    in-game option with a default Auto mode that scales against the pitch's size in the room:
    about 1x on a very large pitch, up to 2x on a very small one.
