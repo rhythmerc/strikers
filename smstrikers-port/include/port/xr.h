@@ -42,6 +42,12 @@ void PortXrEndViews(void);
 // The pause menu opened (1) or closed (0). While it's open the hands can grab the pitch.
 void PortXrPauseMenu(int open);
 
+// How much larger the players (xr_figure_scale) and the ball (xr_ball_scale) are drawn in a 3D
+// frame, so they read at tabletop size; 1 otherwise. Drawing only: physics, AI and replays keep
+// the game's sizes.
+float PortXrFigureScale(void);
+float PortXrBallScale(void);
+
 #ifdef __cplusplus
 }
 #endif

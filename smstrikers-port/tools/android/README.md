@@ -60,12 +60,16 @@ xr_board_depth = 2.5       # game units of board under the pitch
 xr_stands = 1              # the stadium in its stands (near sides cut) instead of on a board
 xr_roof = 8                # game units: everything higher is cut from the 3D view
 xr_flat = 1                # matches on the virtual screen instead of in 3D
+xr_figure_scale = 1.5      # players drawn this much larger in 3D (drawing only, not physics)
+xr_ball_scale = 1.5        # the ball likewise (defaults to xr_figure_scale)
 ```
 
 Matches are in 3D while the camera follows live play, on a metal board standing on the table.
-Replays and cut-scenes stay on the screen. At the default 72 Hz the 3D match runs every frame at
-the top of dynamic resolution (1.3 times the headset's recommended size); at 80 Hz it keeps 98% of
-frames there, and at 90 Hz about as many only at native resolution.
+Replays and cut-scenes stay on the screen. The eyes render at a fixed 1.3 times the headset's
+recommended size, with dynamic resolution off, which the default 72 Hz holds every frame. At 80 or
+90 Hz, `aurora_xr_dynres = 1` with `aurora_xr_eye_scale = 1` brings dynamic resolution back (80 Hz
+kept 98% of frames at 1.3, 90 Hz about as many only at native resolution), or `aurora_xr_eye_scale`
+alone sets a lower fixed scale.
 Pause to grab the pitch and move, turn or scale it.
 
 ## Measure

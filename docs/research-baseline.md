@@ -458,6 +458,8 @@ benchmark demo matches (seed 1), with dynamic resolution off.
     at native resolution.
 - **Default:** 72 Hz, every frame at the top of dynamic resolution: the playable baseline.
   80 Hz was the default at first; a clean 90 Hz is later optimisation work.
+- **Then:** dynamic resolution off, the eyes fixed at 1.3 (2026-10-20). A match's load varies
+  little, and a steady sharp image matters more on the table than headroom.
 
 **Lighting in the eyes:**
 - **Symptom:** stages that are bright in 2D came out dark and tinted in 3D. Mario Stadium's pale

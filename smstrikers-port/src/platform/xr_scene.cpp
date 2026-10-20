@@ -31,6 +31,8 @@ extern "C" int PortXrBoard(float*, float*, float*) { return 0; }
 extern "C" void PortXrSendView(int, const float[3][4]) {}
 extern "C" void PortXrEndViews(void) {}
 extern "C" void PortXrPauseMenu(int) {}
+extern "C" float PortXrFigureScale(void) { return 1.f; }
+extern "C" float PortXrBallScale(void) { return 1.f; }
 
 #else
 
@@ -339,5 +341,13 @@ extern "C" void PortXrEndViews(void)
 }
 
 extern "C" void PortXrPauseMenu(int open) { s_pauseMenus += open ? 1 : -1; }
+
+// At true scale a player on a 1 m pitch is a couple of centimetres tall: the scale makes them read
+// as tabletop figures, the way a board game's pieces outsize its board.
+extern "C" float PortXrFigureScale(void) { return s_3d ? cfg_float("STRIKERS_XR_FIGURE_SCALE", 1.5f) : 1.f; }
+extern "C" float PortXrBallScale(void)
+{
+    return s_3d ? cfg_float("STRIKERS_XR_BALL_SCALE", cfg_float("STRIKERS_XR_FIGURE_SCALE", 1.5f)) : 1.f;
+}
 
 #endif

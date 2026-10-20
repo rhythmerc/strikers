@@ -5,9 +5,12 @@
 #include "Game/Ball.h"
 #include "Game/CharacterTemplate.h"
 #include "Game/Player.h"
+#include "Game/Physics/PhysicsAIBall.h"
 #include "NL/gl/glModel.h"
 #include "NL/gl/glState.h"
 #include "NL/gl/glUserData.h"
+
+#include "port/xr.h"
 
 static int g_nMotionBlurDivs = 5;
 static float g_fMotionBlurAlpha0 = 0.1f;
@@ -167,6 +170,40 @@ void DrawableBall::Render() const
     pDrawableBall->m_translation = mPosition;
     pDrawableBall->m_worldMatrixUpToDate = 0;
 
+    // PORT: XR. A 3D frame draws the players larger (DrawableCharacter's FigureScale), and the ball
+    // with them: held or dribbled, it moves out with its owner's scaled pose, about the owner's
+    // feet; loose, it grows about the point it rests on. The step between the two when it's let
+    // go eases out over a few frames.
+    static nlVector3 sCarry = { 0.0f, 0.0f, 0.0f };
+    const float fBallScale = PortXrBallScale();
+    pDrawableBall->m_scale = fBallScale;
+    if (fBallScale != 1.0f)
+    {
+        nlVector3 loose = mPosition;
+        loose.z += (fBallScale - 1.0f) * g_pBall->GetPhysicsBall()->GetRadius();
+        const DrawableCharacter* owner = IndexToPlayer(mOwnerIndex);
+        if (owner != nullptr)
+        {
+            const float s = PortXrFigureScale();
+            sCarry.x = owner->mPosition.x + (mPosition.x - owner->mPosition.x) * s - loose.x;
+            sCarry.y = owner->mPosition.y + (mPosition.y - owner->mPosition.y) * s - loose.y;
+            sCarry.z = owner->mPosition.z + (mPosition.z - owner->mPosition.z) * s - loose.z;
+        }
+        else
+        {
+            sCarry.x *= 0.75f;
+            sCarry.y *= 0.75f;
+            sCarry.z *= 0.75f;
+        }
+        pDrawableBall->m_translation.x = loose.x + sCarry.x;
+        pDrawableBall->m_translation.y = loose.y + sCarry.y;
+        pDrawableBall->m_translation.z = loose.z + sCarry.z;
+    }
+    else
+    {
+        sCarry.x = sCarry.y = sCarry.z = 0.0f;
+    }
+
     unsigned long uSavedFlags = pDrawableBall->m_uObjectCreationFlags;
     pDrawableBall->m_uObjectCreationFlags &= ~0x80;
     pDrawableBall->Draw();
@@ -174,6 +211,13 @@ void DrawableBall::Render() const
 
     RenderMotionBlur(*pDrawableBall);
     RenderLighting(*pDrawableBall);
+
+    // PORT: XR. Back to the game's size for whatever else draws it (the replays' screen).
+    if (pDrawableBall->m_scale != 1.0f)
+    {
+        pDrawableBall->m_scale = 1.0f;
+        pDrawableBall->m_worldMatrixUpToDate = 0;
+    }
 }
 
 /**

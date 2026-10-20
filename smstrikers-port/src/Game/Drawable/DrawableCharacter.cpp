@@ -103,6 +103,9 @@ void Replayable(SaveFrame& frame, char typeId, cPoseNode*& poseNode)
 #include "NL/nlString.h"
 #include "NL/nlDebug.h"
 #include <dolphin/os.h>
+#include <vector>
+
+#include "port/xr.h"
 const u32 GLTT_BumpLocal_bit = 1 << (int)GLTT_BumpLocal;
 const u32 GLTT_Detail_bit = 1 << (int)GLTT_Detail;
 
@@ -353,6 +356,48 @@ void DrawableCharacter::BuildNodeMatrices()
     }
 }
 
+// PORT: XR. A 3D frame draws the players larger than the game has them (PortXrFigureScale), about
+// their feet: the drawn pose's node matrices are scaled for the draw and put back after it, so
+// whatever else reads them (and the next draw of the same snapshot) sees the game's pose.
+namespace
+{
+class FigureScale
+{
+public:
+    FigureScale(cPoseAccumulator* acc, const nlVector3& feet, float s)
+        : mAcc(s != 1.0f ? acc : nullptr)
+    {
+        if (mAcc == nullptr)
+            return;
+        const int n = mAcc->GetNumNodes();
+        sSaved.resize(n);
+        for (int i = 0; i < n; i++)
+        {
+            nlMatrix4& m = mAcc->GetNodeMatrix(i);
+            sSaved[i] = m;
+            for (int r = 0; r < 3; r++)
+                for (int c = 0; c < 3; c++)
+                    m.e2[r][c] *= s;
+            m.e2[3][0] = feet.x + (m.e2[3][0] - feet.x) * s;
+            m.e2[3][1] = feet.y + (m.e2[3][1] - feet.y) * s;
+            m.e2[3][2] = feet.z + (m.e2[3][2] - feet.z) * s;
+        }
+    }
+    ~FigureScale()
+    {
+        if (mAcc == nullptr)
+            return;
+        for (int i = 0; i < (int)sSaved.size(); i++)
+            mAcc->GetNodeMatrix(i) = sSaved[i];
+    }
+
+private:
+    cPoseAccumulator* mAcc;
+    static std::vector<nlMatrix4> sSaved;
+};
+std::vector<nlMatrix4> FigureScale::sSaved;
+} // namespace
+
 /**
  * Offset/Address/Size: 0x26C4 | 0x8011B574 | size: 0x130
  */
@@ -391,6 +436,7 @@ void DrawableCharacter::Render(cCharacter& character) const
         return;
     }
 
+    FigureScale figureScale(mPoseAccumulator, mPosition, PortXrFigureScale());
     character.PoseSkinMesh(mPoseAccumulator);
 
     if (mCharacter->m_pPropModel != NULL)
