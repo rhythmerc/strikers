@@ -266,11 +266,6 @@ int PortConfigLoad(void)
     port_setenv_default("AURORA_XR_REFRESH", "72");
     port_setenv_default("STRIKERS_FPS_LIMIT", "72");
     port_setenv_default("AURORA_XR_APPSW", "0");
-    // The eyes at a fixed 1.3 of the recommended size, without dynamic resolution: a match's load
-    // varies little, 72 Hz holds 1.3 throughout, and a steady sharp image matters more here than
-    // the headroom a lower scale would buy.
-    port_setenv_default("AURORA_XR_EYE_SCALE", "1.3");
-    port_setenv_default("AURORA_XR_DYNRES", "0");
 #endif
     // After the file, not before: `log` is a key like any other, and a player asked to turn logging
     // on will put it in strikers.ini rather than set an environment variable.

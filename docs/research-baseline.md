@@ -458,8 +458,9 @@ benchmark demo matches (seed 1), with dynamic resolution off.
     at native resolution.
 - **Default:** 72 Hz, every frame at the top of dynamic resolution: the playable baseline.
   80 Hz was the default at first; a clean 90 Hz is later optimisation work.
-- **Then:** dynamic resolution off, the eyes fixed at 1.3 (2026-10-20). A match's load varies
-  little, and a steady sharp image matters more on the table than headroom.
+- **Fixed 1.3, backed out (2026-10-20):** dynamic resolution off with the eyes fixed at 1.3, for
+  a steady sharp image. In play it didn't hold 72 locked, so dynamic resolution is back on until
+  the optimisation pass. Clarity is the goal there: a fixed 1.3 at 72 Hz once it holds.
 
 **Lighting in the eyes:**
 - **Symptom:** stages that are bright in 2D came out dark and tinted in 3D. Mario Stadium's pale
@@ -480,6 +481,25 @@ benchmark demo matches (seed 1), with dynamic resolution off.
   cost.
 - `probe_views`: logs packets and vertices per view.
 - `xr_flat`: keeps matches on the screen.
+
+### Goals for the play space (2026-10-20)
+
+1. **Jumbotron placed at startup.** On launch the player places a jumbotron in the room, for
+   replays and cut-scenes. Its base is extended to the floor with dynamic geometry, with some
+   ambient occlusion where it meets the ground.
+2. **Pitch height and table snapping.** The best spot for the pitch is often above the floor, so
+   the plinth under the board needs dynamic height geometry down to the floor. When there's a
+   real table, the pitch should snap to it.
+3. **The pitch is always visible during a match.** This doesn't settle replays. Test both:
+   replays on the pitch, and replays only on the jumbotron. In the second case the players
+   dissolve out of the 3D pitch for the replay.
+4. **Active player indicator.** The base game marks the controlled player with an arrow above the
+   head, which 3D doesn't show yet and play suffers for it. Use a circle around the feet instead.
+5. **Player scale setting, in game.** The draw scale (`xr_figure_scale`, 1.5 for now) becomes an
+   in-game option with a default Auto mode that scales against the pitch's size in the room:
+   about 1x on a very large pitch, up to 2x on a very small one.
+6. **Optimisation** toward a locked 72 Hz at a fixed 1.3 (then a clean 90). Dynamic resolution
+   stays on until then.
 
 ## 8. Open questions and risks
 

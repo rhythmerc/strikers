@@ -65,11 +65,10 @@ xr_ball_scale = 1.5        # the ball likewise (defaults to xr_figure_scale)
 ```
 
 Matches are in 3D while the camera follows live play, on a metal board standing on the table.
-Replays and cut-scenes stay on the screen. The eyes render at a fixed 1.3 times the headset's
-recommended size, with dynamic resolution off, which the default 72 Hz holds every frame. At 80 or
-90 Hz, `aurora_xr_dynres = 1` with `aurora_xr_eye_scale = 1` brings dynamic resolution back (80 Hz
-kept 98% of frames at 1.3, 90 Hz about as many only at native resolution), or `aurora_xr_eye_scale`
-alone sets a lower fixed scale.
+Replays and cut-scenes stay on the screen. At the default 72 Hz the 3D match runs at or near the
+top of dynamic resolution (1.3 times the headset's recommended size); at 80 Hz it keeps 98% of
+frames there, and at 90 Hz about as many only at native resolution. `aurora_xr_dynres = 0` with
+`aurora_xr_eye_scale = 1.3` fixes the resolution instead.
 Pause to grab the pitch and move, turn or scale it.
 
 ## Measure
