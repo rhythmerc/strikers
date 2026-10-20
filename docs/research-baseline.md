@@ -517,6 +517,19 @@ Melee's dev tools panel came over with Aurora's lib/xr. It is on by default here
 - **Paused on the screen.** The panel now also opens in a match paused on the screen (it used to
   open only in 3D), so you can switch back. Strikers reports the pause on screen frames as well.
   A laser on the panel no longer counts on the screen behind it.
+- **Menus.** The panel also shows in the menus, so VIEW can be picked before a match.
+  - Strikers calls `aurora_xr_set_menus` with no world loaded (stadium -1), which covers the
+    front end.
+  - It opens just right of the screen, at most 0.7 m away; in 3D it still opens right of where
+    you look.
+- **Moving it.** It moves like the virtual screen:
+  - grip it, or take the bar under it with grip, trigger or pinch;
+  - the stick reels it in and out;
+  - a second hand resizes it.
+
+  Once moved it stays where you put it for the session.
+- **Panel on the screen.** On the virtual screen the panel was built and dumped but never added
+  to the frame, so it couldn't be seen there. That's fixed.
 - **Testing.** `AURORA_XR_DUMP` writes the panel as `xr_panel.ppm`. Desktop can't pause the
   benchmark's demo, where Start leaves the demo, so the desktop check forced the pause with a
   temporary switch. The clicks are untested until the headset is back.

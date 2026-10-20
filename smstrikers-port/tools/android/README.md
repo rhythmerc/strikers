@@ -71,9 +71,12 @@ frames there, and at 90 Hz about as many only at native resolution. `aurora_xr_d
 `aurora_xr_eye_scale = 1.3` fixes the resolution instead.
 Pause to grab the pitch and move, turn or scale it.
 
-Pausing also opens the dev tools panel, to the right. Point at it and pull the trigger (or pinch).
-Its Game page has VIEW: 3D, or 2D SCREEN for the match as the game draws it on the virtual
-screen. The panel works there too, to switch back. `aurora_xr_dev_tools = 0` turns it off.
+The dev tools panel shows beside the screen in the menus, and opens again when you pause a match.
+Point at it and pull the trigger (or pinch). Its Game page has VIEW: 3D, or 2D SCREEN for the
+match as the game draws it on the virtual screen. Pick 2D SCREEN in the menus to start a match that
+way, or switch in a pause. To move it, grip it, or take the bar under it with a grip, trigger or
+pinch. Press on it with the other hand as well to resize it. It stays where you put it.
+`aurora_xr_dev_tools = 0` turns it off.
 
 ## Measure
 

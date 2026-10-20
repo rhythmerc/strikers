@@ -275,8 +275,10 @@ extern "C" void PortXrBeginFrame(int cameraType, int stadium, float halfLength, 
     const bool xr = aurora_xr_active();
     const bool screen = xr && screen_picked();
     s_3d = xr && stadium >= 0 && camera_is_live(cameraType) && !screen;
-    // On the screen too, where the dev tools panel still opens in a pause.
+    // On the screen too, where the dev tools panel still opens in a pause; and the menus, where it
+    // shows beside the screen, for VIEW to be picked before a match.
     aurora_xr_set_paused(s_pauseMenus > 0);
+    aurora_xr_set_menus(stadium < 0);
     if (!s_3d)
         return;
 
