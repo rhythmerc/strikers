@@ -10,6 +10,9 @@
 #                                               (both eyes, stacked), the HUD and the screen
 #                                               after 5 s of 3D, as PNGs in
 #                                               build/linux-xr/shots/NAME/dump
+#   tools/xr-desktop.sh serve                  serve build/share (the shots, newest first, and
+#                                               whatever else is put there) on the tailnet, for
+#                                               a phone; runs on the host as a user unit
 #
 # Needs the melee-xr distrobox from ~/projects/xr-toolchain (Monado, the OpenXR loader and the
 # NVIDIA Vulkan driver), with clang-18, lld-18, llvm-18 and libavcodec-dev added, and a checkout
@@ -29,7 +32,24 @@ TOOLCHAIN="${XR_TOOLCHAIN:-$HOME/projects/xr-toolchain}"
 BUILD="$PORT/build/linux-xr"
 DISC="${STRIKERS_DATA:-$HOME/Downloads/strikers-iso/G4QE01.iso}"
 
-# Everything runs in the box; re-enter it from the host.
+SHARE="$PORT/build/share"
+
+# Serving is on the host, as a transient user unit (systemd-run), so it outlives this shell; it
+# lasts until `systemctl --user stop strikers-share` or a reboot.
+if [ "${1:-}" = serve ]; then
+    python3 -I "$PORT/tools/share-index.py" "$SHARE"
+    ip=$(tailscale ip -4 | head -1)
+    port="${STRIKERS_SHARE_PORT:-8787}"
+    if ! systemctl --user is-active --quiet strikers-share; then
+        systemd-run --user --unit=strikers-share --collect \
+            python3 -m http.server "$port" --bind "$ip" --directory "$SHARE" >/dev/null
+    fi
+    name=$(tailscale status --json | python3 -c 'import json, sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')
+    echo "http://$name:$port/  (http://$ip:$port/)"
+    exit 0
+fi
+
+# Everything else runs in the box; re-enter it from the host.
 if [ ! -e /run/.containerenv ] && [ -z "${CONTAINER_ID:-}" ]; then
     exec distrobox enter "$BOX" -- sh "$PORT/tools/xr-desktop.sh" "$@"
 fi
@@ -132,6 +152,7 @@ shot)
     mkdir -p "$dir/dump"
     cp -r "$BUILD/seed/USA" "$dir/"
     ensure_ini "$dir"
+    echo "$*" >"$dir/args.txt"
     # The benchmark's demo match, at a fixed step and seed so a shot repeats. Its intro cut-scene
     # stays on the screen (about 50 s); the 3D eyes are dumped once they've released
     # AURORA_XR_DUMP_AFTER images (300: 5 s of match in 3D), and the run ends there. The pitch
@@ -157,10 +178,11 @@ shot)
     fi
     python3 -I "$PORT/tools/ppm2png.py" "$dir/dump"/*.ppm
     rm -f "$dir/dump"/*.ppm "$dir/dump"/*.pgm
+    python3 -I "$PORT/tools/share-index.py" "$SHARE"
     ls "$dir/dump"
     ;;
 *)
-    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'
     exit 1
     ;;
 esac
