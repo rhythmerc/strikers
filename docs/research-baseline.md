@@ -517,11 +517,22 @@ Melee's dev tools panel came over with Aurora's lib/xr. It is on by default here
 - **Paused on the screen.** The panel now also opens in a match paused on the screen (it used to
   open only in 3D), so you can switch back. Strikers reports the pause on screen frames as well.
   A laser on the panel no longer counts on the screen behind it.
-- **Menus.** The panel also shows in the menus, so VIEW can be picked before a match.
-  - Strikers calls `aurora_xr_set_menus` with no world loaded (stadium -1), which covers the
-    front end.
-  - It opens just right of the screen, at most 0.7 m away; in 3D it still opens right of where
-    you look.
+- **Always on.** The panel shows all the time: in the menus, so VIEW can be picked before a match,
+  and in play. It isn't shown only while the stage is held for placing, or when the app loses
+  focus.
+  - In play, a hand's laser shows only while it's on the panel. While a laser is on it, the
+    triggers click it instead of pressing L or R.
+  - It opens just right of the screen, at most 0.7 m away. If it first shows in 3D, it opens right
+    of where you look.
+- **PLAYERS.** A slider on the Game page (Aurora's `aurora_xr_dev_slider_add`): the players' draw
+  scale in 3D, from 1 to 3. It starts at `xr_figure_scale`, and the ball follows it unless
+  `xr_ball_scale` is set.
+- **Grab box.** Melee's grab box is a fixed ±120 game units. At Strikers' scale that's about
+  4.8 m by 2.4 m around a 1 m pitch, so hands were nearly always inside it, and inside the box a
+  hand shows a dot at its tip instead of a laser.
+  - `aurora_xr_set_grab_box` now lets the game set the box for each stage. Strikers sends the
+    board, from its foot to 4 units over the pitch.
+  - A laser on the panel always shows.
 - **Moving it.** It moves like the virtual screen:
   - grip it, or take the bar under it with grip, trigger or pinch;
   - the stick reels it in and out;

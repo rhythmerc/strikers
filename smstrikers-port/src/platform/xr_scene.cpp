@@ -132,9 +132,9 @@ int s_stadium = -1;
 float s_halfLength, s_halfWidth;
 int s_pauseMenus;
 
-// The dev tools panel's VIEW option (aurora_xr_dev_option_add), in a paused match: the match in
-// 3D, or on the virtual screen as the game draws it in 2D, to compare with. Without dev tools,
-// xr_flat in strikers.ini picks the screen.
+// The dev tools panel's VIEW option (aurora_xr_dev_option_add): the match in 3D, or on the virtual
+// screen as the game draws it in 2D, to compare with. Without dev tools, xr_flat in strikers.ini
+// picks the screen.
 bool screen_picked()
 {
     static const int option = [] {
@@ -143,6 +143,17 @@ bool screen_picked()
     }();
     const int v = aurora_xr_dev_option(option);
     return v >= 0 ? v == 1 : std::getenv("STRIKERS_XR_FLAT") != nullptr;
+}
+
+float cfg_float(const char* env, float fallback);
+
+// The players' draw scale in 3D: the dev tools panel's PLAYERS slider (from xr_figure_scale), or
+// xr_figure_scale without it. The ball follows unless xr_ball_scale sets its own.
+float figure_scale()
+{
+    const float configured = cfg_float("STRIKERS_XR_FIGURE_SCALE", 1.5f);
+    static const int slider = aurora_xr_dev_slider_add("PLAYERS", 1.f, 3.f, 0.05f, configured);
+    return aurora_xr_dev_slider(slider, configured);
 }
 
 float cfg_float(const char* env, float fallback)
@@ -164,6 +175,7 @@ float board_half_x() { return s_halfLength + cfg_float("STRIKERS_XR_BOARD_END", 
 float board_half_y() { return s_halfWidth + cfg_float("STRIKERS_XR_BOARD_SIDE", 2.0f); }
 float board_depth() { return cfg_float("STRIKERS_XR_BOARD_DEPTH", 2.5f); }
 constexpr float kBoardFlare = 1.2f + 0.35f;   // the foot's reach past the top (XrBoard.cpp)
+constexpr float kGrabHeadroom = 4.f;   // game units over the pitch the hands can grab it by
 
 void place_stadium(int stadium)
 {
@@ -177,6 +189,9 @@ void place_stadium(int stadium)
         aurora_xr_set_stage(stadium, 0.f, -depth, 0.f, scale);
         const float fx = board_half_x() + kBoardFlare, fy = board_half_y() + kBoardFlare;
         aurora_xr_set_stage_footprint(-fx, fx, -fy, fy, -depth);
+        // The hands take the board by its foot up to a little over the players' heads; a hand in
+        // it touches the pitch rather than pointing. (Game y is Aurora's -z.)
+        aurora_xr_set_grab_box(-fx, fx, -depth, kGrabHeadroom, -fy, fy);
     }
     else
     {
@@ -184,6 +199,7 @@ void place_stadium(int stadium)
         // the near sides (update_cuts) and seen across the pitch, so they cast no shadow.
         aurora_xr_set_stage(stadium, 0.f, 0.f, 0.f, scale);
         aurora_xr_set_stage_footprint(-s_halfLength, s_halfLength, -s_halfWidth, s_halfWidth, 0.f);
+        aurora_xr_set_grab_box(-s_halfLength, s_halfLength, 0.f, kGrabHeadroom, -s_halfWidth, s_halfWidth);
     }
     OSReport("[port] xr: stadium %d, pitch %.1f x %.1f units, %.2f m long, %s\n", stadium,
              2.f * s_halfLength, 2.f * s_halfWidth, pitch_metres(), board_on() ? "on a board" : "in its stands");
@@ -274,11 +290,10 @@ extern "C" void PortXrBeginFrame(int cameraType, int stadium, float halfLength, 
     // The option goes on the panel with the first XR frame, before any pause.
     const bool xr = aurora_xr_active();
     const bool screen = xr && screen_picked();
+    if (xr)
+        figure_scale();   // the PLAYERS slider goes on the panel with VIEW
     s_3d = xr && stadium >= 0 && camera_is_live(cameraType) && !screen;
-    // On the screen too, where the dev tools panel still opens in a pause; and the menus, where it
-    // shows beside the screen, for VIEW to be picked before a match.
     aurora_xr_set_paused(s_pauseMenus > 0);
-    aurora_xr_set_menus(stadium < 0);
     if (!s_3d)
         return;
 
@@ -362,10 +377,10 @@ extern "C" void PortXrPauseMenu(int open) { s_pauseMenus += open ? 1 : -1; }
 
 // At true scale a player on a 1 m pitch is a couple of centimetres tall: the scale makes them read
 // as tabletop figures, the way a board game's pieces outsize its board.
-extern "C" float PortXrFigureScale(void) { return s_3d ? cfg_float("STRIKERS_XR_FIGURE_SCALE", 1.5f) : 1.f; }
+extern "C" float PortXrFigureScale(void) { return s_3d ? figure_scale() : 1.f; }
 extern "C" float PortXrBallScale(void)
 {
-    return s_3d ? cfg_float("STRIKERS_XR_BALL_SCALE", cfg_float("STRIKERS_XR_FIGURE_SCALE", 1.5f)) : 1.f;
+    return s_3d ? cfg_float("STRIKERS_XR_BALL_SCALE", figure_scale()) : 1.f;
 }
 
 #endif
