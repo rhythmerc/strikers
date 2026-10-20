@@ -267,6 +267,9 @@ int PortConfigLoad(void)
     port_setenv_default("STRIKERS_FPS_LIMIT", "72");
     port_setenv_default("AURORA_XR_APPSW", "0");
 #endif
+    // The dev tools panel in a paused match (Aurora's lib/xr; the VIEW option, src/platform/
+    // xr_scene.cpp), on while the port is in development. aurora_xr_dev_tools = 0 hides it.
+    port_setenv_default("AURORA_XR_DEV_TOOLS", "1");
     // After the file, not before: `log` is a key like any other, and a player asked to turn logging
     // on will put it in strikers.ini rather than set an environment variable.
     open_log();

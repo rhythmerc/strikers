@@ -480,7 +480,7 @@ benchmark demo matches (seed 1), with dynamic resolution off.
 - `xr_hide` (eGLView numbers): leaves views out of 3D, to measure each one's
   cost.
 - `probe_views`: logs packets and vertices per view.
-- `xr_flat`: keeps matches on the screen.
+- `xr_flat`: keeps matches on the screen (the panel's VIEW starts on 2D SCREEN).
 - `xr_rings_all`: puts the active-player ring under every player, so AI-only matches show it.
 
 **Desktop testing against Monado (2026-10-20):** `tools/xr-desktop.sh` builds the OpenXR path
@@ -501,6 +501,25 @@ feet instead, in their number's colour: 1 yellow, 2 blue, 3 green, 4 red, read f
 the disc. It's sized to the player as drawn, closes in from twice its size on a switch, and pulses
 while its player has the ball, as the number did. The overhead numbers and off-screen markers are
 left out of 3D frames; the flat screen keeps them. `src/Game/Render/Indicators.cpp`.
+
+### Dev tools panel (2026-10-20)
+
+Melee's dev tools panel came over with Aurora's lib/xr. It is on by default here
+(`aurora_xr_dev_tools`, `src/platform/config.c`) and opens on a pause.
+- **Game page.** Aurora now has a page for the game's own options:
+  `aurora_xr_dev_option_add(name, count, choices, initial)`, read back with
+  `aurora_xr_dev_option`.
+  - A page appears only when it has something on it. Strikers sends no grade, audio or mixer
+    settings, so Game is the only tab here.
+- **VIEW.** Strikers' first option, set in `src/platform/xr_scene.cpp`. 3D, or 2D SCREEN, which
+  keeps the match on the virtual screen as the flat game draws it, for comparing with the 2D
+  path. `xr_flat` starts it on 2D SCREEN.
+- **Paused on the screen.** The panel now also opens in a match paused on the screen (it used to
+  open only in 3D), so you can switch back. Strikers reports the pause on screen frames as well.
+  A laser on the panel no longer counts on the screen behind it.
+- **Testing.** `AURORA_XR_DUMP` writes the panel as `xr_panel.ppm`. Desktop can't pause the
+  benchmark's demo, where Start leaves the demo, so the desktop check forced the pause with a
+  temporary switch. The clicks are untested until the headset is back.
 
 ### Goals for the play space (2026-10-20)
 

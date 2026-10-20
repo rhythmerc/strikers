@@ -22,7 +22,10 @@
 # Monado's debug window first.
 #
 # Settings go on the command line as VAR=value (STRIKERS_FORCE_STADIUM=2, AURORA_XR_ARENA_POS=...)
-# or in build/linux-xr/run/strikers.ini, as on the headset.
+# or in build/linux-xr/run/strikers.ini, as on the headset. A shot ends at the 3D dump; with no 3D
+# (STRIKERS_XR_FLAT=1), STRIKERS_XR_SHOT_WAIT='Dumped screen' and an AURORA_XR_DUMP_AFTER past the
+# intro (3500) take the screen in the match instead. STRIKERS_AUTOPRESS='Start@3400' pauses about
+# 7 s into it, which opens the dev tools panel (dumped as xr_panel).
 
 set -e
 
@@ -161,7 +164,7 @@ shot)
         AURORA_XR_DUMP="$dir/dump" AURORA_XR_DUMP_AFTER=300 AURORA_XR_ARENA_POS=0,-0.5,-1.0 "$@" \
         timeout "${STRIKERS_XR_SHOT_SECONDS:-150}" >"$dir/out.log" 2>&1 &
     game=$!
-    while kill -0 $game 2>/dev/null && ! grep -q "Dumped 3d" "$dir/out.log"; do
+    while kill -0 $game 2>/dev/null && ! grep -q "${STRIKERS_XR_SHOT_WAIT:-Dumped 3d}" "$dir/out.log"; do
         sleep 1
     done
     i=0   # the HUD's comes a moment later, when there is one
@@ -172,8 +175,8 @@ shot)
     # The game's teardown under a signal can fault; the shot is already on disk.
     pkill -KILL -f "^$BUILD/strikers" 2>/dev/null || true
     wait $game 2>/dev/null || true
-    if [ ! -f "$dir/dump/xr_3d.ppm" ]; then
-        echo "error: no 3D frame was dumped; see $dir/out.log" >&2
+    if ! ls "$dir/dump"/*.ppm >/dev/null 2>&1; then
+        echo "error: nothing was dumped; see $dir/out.log" >&2
         exit 1
     fi
     python3 -I "$PORT/tools/ppm2png.py" "$dir/dump"/*.ppm
@@ -182,7 +185,7 @@ shot)
     ls "$dir/dump"
     ;;
 *)
-    sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'
     exit 1
     ;;
 esac

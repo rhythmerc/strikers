@@ -132,6 +132,19 @@ int s_stadium = -1;
 float s_halfLength, s_halfWidth;
 int s_pauseMenus;
 
+// The dev tools panel's VIEW option (aurora_xr_dev_option_add), in a paused match: the match in
+// 3D, or on the virtual screen as the game draws it in 2D, to compare with. Without dev tools,
+// xr_flat in strikers.ini picks the screen.
+bool screen_picked()
+{
+    static const int option = [] {
+        static const char* const kChoices[] = {"3D", "2D SCREEN"};
+        return aurora_xr_dev_option_add("VIEW", 2, kChoices, std::getenv("STRIKERS_XR_FLAT") != nullptr);
+    }();
+    const int v = aurora_xr_dev_option(option);
+    return v >= 0 ? v == 1 : std::getenv("STRIKERS_XR_FLAT") != nullptr;
+}
+
 float cfg_float(const char* env, float fallback)
 {
     const char* v = std::getenv(env);
@@ -258,8 +271,12 @@ void send_cuts()
 extern "C" void PortXrBeginFrame(int cameraType, int stadium, float halfLength, float halfWidth)
 {
     s_cutsSent = -1;
-    s_3d = aurora_xr_active() && stadium >= 0 && camera_is_live(cameraType) &&
-           std::getenv("STRIKERS_XR_FLAT") == nullptr;
+    // The option goes on the panel with the first XR frame, before any pause.
+    const bool xr = aurora_xr_active();
+    const bool screen = xr && screen_picked();
+    s_3d = xr && stadium >= 0 && camera_is_live(cameraType) && !screen;
+    // On the screen too, where the dev tools panel still opens in a pause.
+    aurora_xr_set_paused(s_pauseMenus > 0);
     if (!s_3d)
         return;
 
@@ -270,7 +287,6 @@ extern "C" void PortXrBeginFrame(int cameraType, int stadium, float halfLength, 
         s_halfWidth = halfWidth;
         place_stadium(stadium);
     }
-    aurora_xr_set_paused(s_pauseMenus > 0);
     update_cuts();
 }
 
