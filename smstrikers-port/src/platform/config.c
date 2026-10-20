@@ -260,10 +260,11 @@ int PortConfigLoad(void)
 #if defined(__ANDROID__)
     // The headset's defaults, under whatever the file set. The game draws a fresh frame every
     // display frame, so Aurora's SpaceWarp (built for Melee's 60 Hz game) would only add a pass.
-    // At 80 Hz a 3D match keeps 98% of frames at dynamic resolution's top scale; 90 Hz keeps about
-    // as many only at native resolution (docs/research-baseline.md, step 4).
-    port_setenv_default("AURORA_XR_REFRESH", "80");
-    port_setenv_default("STRIKERS_FPS_LIMIT", "80");
+    // 72 Hz is the playable baseline: every frame at dynamic resolution's top scale. 80 Hz keeps 98%
+    // of them there and 90 Hz about as many only at native resolution (docs/research-baseline.md,
+    // step 4); a clean 90 is later optimisation work.
+    port_setenv_default("AURORA_XR_REFRESH", "72");
+    port_setenv_default("STRIKERS_FPS_LIMIT", "72");
     port_setenv_default("AURORA_XR_APPSW", "0");
 #endif
     // After the file, not before: `log` is a key like any other, and a player asked to turn logging

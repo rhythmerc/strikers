@@ -48,7 +48,7 @@ then stops, because there is no disc yet.
 - **Saves and caches:** these live in the app's internal storage
   (`run-as dev.strikers.game ls files`).
 
-Useful settings (the first two default to 80 here; see below):
+Useful settings (the first two default to 72 here; see below):
 
 ```ini
 AURORA_XR_REFRESH = 90     # 72, 80, 90 or 120
@@ -63,9 +63,9 @@ xr_flat = 1                # matches on the virtual screen instead of in 3D
 ```
 
 Matches are in 3D while the camera follows live play, on a metal board standing on the table.
-Replays and cut-scenes stay on the screen. At 80 Hz the 3D match runs at the top of dynamic
-resolution (1.3 times the headset's recommended size); at 90 Hz it holds about as well at native
-resolution, and at 72 Hz with room to spare.
+Replays and cut-scenes stay on the screen. At the default 72 Hz the 3D match runs every frame at
+the top of dynamic resolution (1.3 times the headset's recommended size); at 80 Hz it keeps 98% of
+frames there, and at 90 Hz about as many only at native resolution.
 Pause to grab the pitch and move, turn or scale it.
 
 ## Measure

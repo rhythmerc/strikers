@@ -456,7 +456,22 @@ benchmark demo matches (seed 1), with dynamic resolution off.
   - The 3D image waits counted above were that, not a cause.
   - With the stands in, the eyes cost 9 ms; on the board they cost 6.6 ms
     at native resolution.
-- **Default:** 80 Hz, at the top of dynamic resolution.
+- **Default:** 72 Hz, every frame at the top of dynamic resolution: the playable baseline.
+  80 Hz was the default at first; a clean 90 Hz is later optimisation work.
+
+**Lighting in the eyes:**
+- **Symptom:** stages that are bright in 2D came out dark and tinted in 3D. Mario Stadium's pale
+  pitch was navy and Forbidden Dome's concrete was murky. Wario, Yoshi and Super looked close.
+- **Cause:** Aurora's batched eye shader read each draw's normal matrices at Melee's uniform offset
+  (word 260). Strikers' Aurora has 13 position matrices, not 10, so the normal matrices start at
+  word 296. Every batched lit draw was lit with texture-matrix words as its normals.
+  `AURORA_XR_BATCH=0` showed the right colours, which is how it was found. The offsets now come
+  from `MaxPnMtx` and `MaxTexMtx`.
+- **Fog in the eyes** also used the eye's own depth, and a per-column range table indexed by the
+  eye's pixel columns. It now takes the game camera's depth, as the flat frame does, without the
+  range adjustment.
+- **Tools:** a stadium can be forced with `force_stadium` (0–6). The eye dump (`AURORA_XR_DUMP`)
+  set beside desktop shots of the same stadium is the quickest way to compare.
 
 **Debug settings:**
 - `xr_hide` (eGLView numbers): leaves views out of 3D, to measure each one's
