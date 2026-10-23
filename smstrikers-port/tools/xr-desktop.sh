@@ -38,9 +38,14 @@ DISC="${STRIKERS_DATA:-$HOME/Downloads/strikers-iso/G4QE01.iso}"
 SHARE="$PORT/build/share"
 
 # Serving is on the host, as a transient user unit (systemd-run), so it outlives this shell; it
-# lasts until `systemctl --user stop strikers-share` or a reboot.
+# lasts until `systemctl --user stop strikers-share` or a reboot. With the tailnet-share Claude
+# skill installed, build/share joins its server (one server for every project) instead.
 if [ "${1:-}" = serve ]; then
     python3 -I "$PORT/tools/share-index.py" "$SHARE"
+    skill="$HOME/.claude/skills/tailnet-share/scripts/share.py"
+    if [ -f "$skill" ]; then
+        exec python3 -I "$skill" link "$SHARE" --project strikers-xr
+    fi
     ip=$(tailscale ip -4 | head -1)
     port="${STRIKERS_SHARE_PORT:-8787}"
     if ! systemctl --user is-active --quiet strikers-share; then
