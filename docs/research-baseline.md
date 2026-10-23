@@ -545,6 +545,46 @@ Melee's dev tools panel came over with Aurora's lib/xr. It is on by default here
   benchmark's demo, where Start leaves the demo, so the desktop check forced the pause with a
   temporary switch. The clicks are untested until the headset is back.
 
+### Board placement at launch (2026-10-23, first prototype)
+
+The goals below (2) want the pitch on a table or raised off the floor, so placement differs from
+Melee's free-floating grab. At launch Aurora runs three steps before anything else shows (on by
+default: `aurora_xr_place_at_start`).
+
+**The steps**
+1. **Where.** A laser meets a level surface (within about 20 degrees); the board stands there,
+   broadside to the head.
+2. **Size.** The board's edge follows the laser on that surface. The size runs from 0.25 to 4
+   times the configured pitch length (`xr_pitch`).
+3. **Height.** The top follows where the laser meets the upright plane through the board. Under
+   the board, a stand runs down to the surface.
+
+**Controls.** Trigger or pinch confirms a step. The stick turns the board. B, Y or the grip goes
+back a step; B on step 1 skips placing. The game sees an idle pad throughout.
+
+**Where surfaces come from.** The surface worker casts each laser with
+`XR_META_environment_raycast` about 45 times a second. The XR thread meets the current laser with
+the last hit's plane, so the aim moves at display rate. Without the raycaster, the floor
+(`XR_EXT_local_floor`) stands in, plus any `AURORA_XR_PLACE_TABLE` rectangles (desktop).
+
+**What's drawn.** Before any match the board is a proxy made of quad layers: the top with a drawn
+pitch, the sides that face the head, and the stand. Strikers gives Aurora its dimensions
+(`aurora_xr_set_board_proxy`, from the board settings and a 41.2 x 24.2 unit pitch). The result is
+adopted as every stage's start. In matches the board's own mesh draws the stand
+(`PortXrStand` <- `aurora_xr_stand_height`: from the arena down to the surface placed on).
+
+**Desktop check.** `AURORA_XR_PLACE_AUTO=k,height[,dist]` places unattended and dumps each step
+(`xr_place1-3`), seen from the eye turned toward the board. Shots: `place-table` (0.8 m on a
+simulated table), `place-floor` (1.2 m on a 0.6 m stand) and `place-floor-far` (the stand in the
+match's 3D view).
+
+**Not yet**
+- Untested on the headset: controllers, hands and the raycast.
+- No contact shadow under the proxy.
+- A recenter after placing leaves the stand's surface height stale.
+- Snapping to a table's edges (`XR_FB_scene` planes) isn't done.
+- The jumbotron isn't placed.
+
 ### Goals for the play space (2026-10-20)
 
 1. **Jumbotron placed at startup.** On launch the player places a jumbotron in the room, for

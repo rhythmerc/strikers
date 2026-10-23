@@ -79,6 +79,17 @@ PLAYERS, the players' draw scale in 3D (from `xr_figure_scale`; the ball follows
 pinch. Press on it with the other hand as well to resize it. It stays where you put it.
 `aurora_xr_dev_tools = 0` turns it off.
 
+At launch, before anything else shows, you place the board, in three steps on a card ahead of you:
+1. **Where.** Point at the floor or a table: the board stands where the laser meets a level
+   surface, broadside to you. Pull the trigger or pinch to put it down.
+2. **Size.** Point where its edge goes.
+3. **Height.** Point where its top goes. It rises on a stand that grows down to the surface.
+
+The stick turns the board, and B, Y or the grip goes back a step. B on the first step skips
+placing, so stages start in front of you as before. Surfaces come from the headset's depth (Quest
+3 and 3S, with the spatial data permission), else the floor. Every stage starts where you put the
+board. `aurora_xr_place_at_start = 0` turns this off.
+
 ## Measure
 
 `benchmark = 1` (with `benchmark_seconds`, `seed` and `bench_record`) drives

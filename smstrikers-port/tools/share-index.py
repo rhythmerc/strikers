@@ -17,7 +17,9 @@ PORT = Path(__file__).resolve().parent.parent
 IMAGES = (".png", ".jpg", ".jpeg", ".gif", ".webp")
 # Each shot's images, in the order shown, with a caption.
 SHOT_IMAGES = (("xr_3d.png", "eyes (left above right)"), ("xr_hud.png", "HUD"),
-               ("xr_screen.png", "screen"), ("xr_panel.png", "dev tools panel"))
+               ("xr_screen.png", "screen"), ("xr_panel.png", "dev tools panel"),
+               ("xr_place1.png", "placing: where"), ("xr_place2.png", "placing: size"),
+               ("xr_place3.png", "placing: height"))
 
 STYLE = """
 :root { color-scheme: light dark; --bg: #fafafa; --fg: #1a1a1a; --dim: #666; --card: #fff; --line: #ddd; }

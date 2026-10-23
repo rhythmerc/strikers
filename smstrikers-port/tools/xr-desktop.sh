@@ -25,7 +25,9 @@
 # or in build/linux-xr/run/strikers.ini, as on the headset. A shot ends at the 3D dump; with no 3D
 # (STRIKERS_XR_FLAT=1), STRIKERS_XR_SHOT_WAIT='Dumped screen' and an AURORA_XR_DUMP_AFTER past the
 # intro (3500) take the screen in the match instead. STRIKERS_AUTOPRESS='Start@3400' pauses about
-# 7 s into it, which opens the dev tools panel (dumped as xr_panel).
+# 7 s into it, which opens the dev tools panel (dumped as xr_panel). Shots skip placing the board at
+# launch; AURORA_XR_PLACE_AT_START=1 AURORA_XR_PLACE_AUTO=0.8,0.15 places it unattended (on
+# AURORA_XR_PLACE_TABLE=x,y,z,halfX,halfZ, else the floor) and dumps each step (xr_place1-3).
 
 set -e
 
@@ -166,7 +168,8 @@ shot)
     # AURORA_XR_DUMP_AFTER images (300: 5 s of match in 3D), and the run ends there. The pitch
     # stands a metre out and half a metre under the simulated eyes, which look straight ahead.
     run_game "$dir" STRIKERS_BENCHMARK=1 STRIKERS_FIXED_DT=1 STRIKERS_SEED=1 \
-        AURORA_XR_DUMP="$dir/dump" AURORA_XR_DUMP_AFTER=300 AURORA_XR_ARENA_POS=0,-0.5,-1.0 "$@" \
+        AURORA_XR_DUMP="$dir/dump" AURORA_XR_DUMP_AFTER=300 AURORA_XR_ARENA_POS=0,-0.5,-1.0 \
+        AURORA_XR_PLACE_AT_START=0 "$@" \
         timeout "${STRIKERS_XR_SHOT_SECONDS:-150}" >"$dir/out.log" 2>&1 &
     game=$!
     while kill -0 $game 2>/dev/null && ! grep -q "${STRIKERS_XR_SHOT_WAIT:-Dumped 3d}" "$dir/out.log"; do
@@ -190,7 +193,7 @@ shot)
     ls "$dir/dump"
     ;;
 *)
-    sed -n '2,28p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'
     exit 1
     ;;
 esac

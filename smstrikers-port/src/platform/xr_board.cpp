@@ -27,6 +27,7 @@ const Shade kTop = { 28, 30, 34 };
 const Shade kBevel = { 104, 108, 116 };
 const Shade kSide = { 52, 56, 64 };
 const Shade kFoot = { 18, 19, 22 };
+const Shade kStand = { 34, 36, 41 };   // the stand's column, darker than the board
 
 nlColour lit(const Shade& s, float k)
 {
@@ -75,9 +76,12 @@ extern "C" void PortXrDrawBoard(void)
     glSetCurrentTextureState(glHandleizeTextureState());
     const unsigned long prevProgram = glSetCurrentProgram(BoardProgram);
 
+    float standX, standY, standH;
+    const bool stand = PortXrStand(&standX, &standY, &standH);
+
     static const eGLStream kStreams[3] = { (eGLStream)0, (eGLStream)2, (eGLStream)3 };
     GLMeshWriter w;
-    if (!w.Begin(4 * (1 + 4 * 3), GLP_QuadList, 3, kStreams, false))
+    if (!w.Begin(4 * (1 + 4 * 3 + (stand ? 4 : 0)), GLP_QuadList, 3, kStreams, false))
     {
         glSetCurrentProgram(prevProgram);
         return;
@@ -128,6 +132,25 @@ extern "C" void PortXrDrawBoard(void)
             const nlColour c[4] = { upper, lower, lower, upper };
             quad(w, p, c);
         }
+    }
+
+    // The stand: a plain column from the foot down to the surface the board was placed on, lit like
+    // the sides and darkening toward the surface.
+    for (int side = 0; stand && side < 4; side++)
+    {
+        static const float kCorner[5][2] = { { 1, -1 }, { 1, 1 }, { -1, 1 }, { -1, -1 }, { 1, -1 } };
+        const float* a = kCorner[side];
+        const float* b = kCorner[side + 1];
+        const float zTop = -depth, zBottom = -depth - standH;
+        const nlVector3 p[4] = {
+            { a[0] * standX, a[1] * standY, zTop },
+            { a[0] * standX, a[1] * standY, zBottom },
+            { b[0] * standX, b[1] * standY, zBottom },
+            { b[0] * standX, b[1] * standY, zTop },
+        };
+        const nlColour upper = lit(kStand, kSideLight[side]), lower = lit(kStand, kSideLight[side] * 0.6f);
+        const nlColour c[4] = { upper, lower, lower, upper };
+        quad(w, p, c);
     }
 
     const bool ended = w.End();

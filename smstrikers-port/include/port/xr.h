@@ -28,6 +28,11 @@ int PortXrCullPlanes(float planes[6][4]);
 // is cut along the top's edge. Returns 0 otherwise.
 int PortXrBoard(float* halfX, float* halfY, float* depth);
 
+// Under the board, when it was placed up off the surface: the stand's column, as half-extents
+// along x and y and its height down from the board's foot to the surface, in game units. Returns 0
+// when there is none.
+int PortXrStand(float* halfX, float* halfY, float* height);
+
 // From the world's render, each frame: puts the board in this frame's draw lists (a no-op outside
 // a 3D frame on a board). src/platform/xr_board.cpp.
 void PortXrDrawBoard(void);

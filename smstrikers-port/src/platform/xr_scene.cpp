@@ -28,6 +28,7 @@ extern "C" void PortXrBeginFrame(int, int, float, float) {}
 extern "C" int PortXr3D(void) { return 0; }
 extern "C" int PortXrCullPlanes(float[6][4]) { return 0; }
 extern "C" int PortXrBoard(float*, float*, float*) { return 0; }
+extern "C" int PortXrStand(float*, float*, float*) { return 0; }
 extern "C" void PortXrSendView(int, const float[3][4]) {}
 extern "C" void PortXrEndViews(void) {}
 extern "C" void PortXrPauseMenu(int) {}
@@ -130,6 +131,9 @@ int s_cutsSent;     // this frame: -1 nothing yet, 0 world draws uncut (the boar
 constexpr int kBoardView = 7;
 int s_stadium = -1;
 float s_halfLength, s_halfWidth;
+// The pitch's half-extents in game units before a match has given them (every stadium's, as far as
+// seen), for the board placed at launch.
+constexpr float kPitchHalfLength = 20.6f, kPitchHalfWidth = 12.1f;
 int s_pauseMenus;
 
 // The dev tools panel's VIEW option (aurora_xr_dev_option_add): the match in 3D, or on the virtual
@@ -176,6 +180,29 @@ float board_half_y() { return s_halfWidth + cfg_float("STRIKERS_XR_BOARD_SIDE", 
 float board_depth() { return cfg_float("STRIKERS_XR_BOARD_DEPTH", 2.5f); }
 constexpr float kBoardFlare = 1.2f + 0.35f;   // the foot's reach past the top (XrBoard.cpp)
 constexpr float kGrabHeadroom = 4.f;   // game units over the pitch the hands can grab it by
+// The stand's column under a raised board, against the board's foot.
+constexpr float kStandX = 0.3f, kStandY = 0.45f;
+
+// The board as Aurora draws it while it's placed at launch (aurora_xr_set_board_proxy), in metres
+// at its default scale: what place_stadium makes of it.
+void send_board_proxy()
+{
+    const float hl = s_halfLength > 0.f ? s_halfLength : kPitchHalfLength;
+    const float hw = s_halfWidth > 0.f ? s_halfWidth : kPitchHalfWidth;
+    const float m = pitch_metres() / (2.f * hl);   // metres a game unit
+    const float topX = hl + cfg_float("STRIKERS_XR_BOARD_END", 3.0f), topY = hw + cfg_float("STRIKERS_XR_BOARD_SIDE", 2.0f);
+    AuroraXrBoardProxy p;
+    p.pitchHalfX = hl * m;
+    p.pitchHalfZ = hw * m;
+    p.topHalfX = topX * m;
+    p.topHalfZ = topY * m;
+    p.footHalfX = (topX + kBoardFlare) * m;
+    p.footHalfZ = (topY + kBoardFlare) * m;
+    p.depth = board_depth() * m;
+    p.standHalfX = p.footHalfX * kStandX;
+    p.standHalfZ = p.footHalfZ * kStandY;
+    aurora_xr_set_board_proxy(&p);
+}
 
 void place_stadium(int stadium)
 {
@@ -292,6 +319,12 @@ extern "C" void PortXrBeginFrame(int cameraType, int stadium, float halfLength, 
     const bool screen = xr && screen_picked();
     if (xr)
         figure_scale();   // the PLAYERS slider goes on the panel with VIEW
+    static bool proxySent = false;
+    if (xr && board_on() && !proxySent)
+    {
+        send_board_proxy();
+        proxySent = true;
+    }
     s_3d = xr && stadium >= 0 && camera_is_live(cameraType) && !screen;
     aurora_xr_set_paused(s_pauseMenus > 0);
     if (!s_3d)
@@ -316,6 +349,19 @@ extern "C" int PortXrBoard(float* halfX, float* halfY, float* depth)
     *halfX = board_half_x();
     *halfY = board_half_y();
     *depth = board_depth();
+    return 1;
+}
+
+extern "C" int PortXrStand(float* halfX, float* halfY, float* height)
+{
+    if (!s_3d || !board_on())
+        return 0;
+    const float h = aurora_xr_stand_height();
+    if (h <= 0.f)
+        return 0;
+    *halfX = (board_half_x() + kBoardFlare) * kStandX;
+    *halfY = (board_half_y() + kBoardFlare) * kStandY;
+    *height = h;
     return 1;
 }
 
